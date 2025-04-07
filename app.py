@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import RedirectResponse
+from starlette.concurrency import run_in_threadpool
 from typing import List
 import boto3
 import os
@@ -41,7 +42,13 @@ async def upload_file(file: UploadFile = File(...)):
     file_name = file.filename
 
     try:
-        s3_client.upload_fileobj(file.file, BUCKET_NAME, file_name)
+        # Run the upload_fileobj via the threadpool and await it
+        await run_in_threadpool( 
+            s3_client.upload_fileobj,   
+            file.file,
+            BUCKET_NAME,
+            file_name
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to MinIO: {str(e)}")
 
