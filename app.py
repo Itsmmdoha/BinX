@@ -1,80 +1,48 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import RedirectResponse
-from starlette.concurrency import run_in_threadpool
-from typing import List
-import boto3
-import os
-from datetime import datetime
+from fastapi import FastAPI, Depends, HTTPException, Response, Request
+from pydantic import BaseModel
+
+from dbm import Vault, File, get_session
+from auth_helper import Password, Token
+
+
+class VaultInfo(BaseModel):
+    vault: str
+    password: str
 
 app = FastAPI()
 
-# In-memory list of file metadata
-file_metadata: List[dict] = []
-
-# MinIO config
-MINIO_ENDPOINT = "localhost:9000"
-ACCESS_KEY = "minioadmin"
-SECRET_KEY = "minioadmin"
-BUCKET_NAME = "uploads"
-
-# Boto3 client for MinIO
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=f"http://{MINIO_ENDPOINT}",
-    aws_access_key_id=ACCESS_KEY,
-    aws_secret_access_key=SECRET_KEY,
-)
-
-# Ensure bucket exists
-try:
-    s3_client.head_bucket(Bucket=BUCKET_NAME)
-except:
-    s3_client.create_bucket(Bucket=BUCKET_NAME)
-
-
 @app.get("/")
-def get_metadata():
-    return file_metadata
+def list_vaults(session = Depends(get_session)):
+    return session.query(Vault).all()
 
-
-@app.post("/")
-async def upload_file(file: UploadFile = File(...)):
-    file_name = file.filename
-
+@app.post("/vault/create")
+def create_vault(vault_info: VaultInfo, db_session = Depends(get_session)):
+    hashed_password = Password.generate_hash(vault_info.password)
+    new_vault = Vault(vault=vault_info.vault, size=500, password_hash = hashed_password)
+    db_session.add(new_vault)
     try:
-        # Run the upload_fileobj via the threadpool and await it
-        await run_in_threadpool( 
-            s3_client.upload_fileobj,   
-            file.file,
-            BUCKET_NAME,
-            file_name
+        db_session.commit()
+    except:
+        raise HTTPException(status_code=409, detail=f"Vaultname: {vault_info.vault} already exists")
+    return {"msg":"vault created successfully"}
+
+@app.post("/vault/login")
+def login(response: Response, vault_info: VaultInfo, db_session = Depends(get_session)):
+    vault = db_session.query(Vault).filter(Vault.vault==vault_info.vault).first()
+    if Password.is_valid(password=vault_info.password, hash_string=vault.password_hash):
+        payload = {"vault":vault.vault}
+        token = Token.generate(payload, valid_for=12*3600)  # valid for 1 hour
+
+        response.set_cookie(
+            key="access_token",
+            value=token,
+            httponly=True,  
+            max_age=12*3600,   
+            #secure=True,   
+            samesite="lax"  
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload to MinIO: {str(e)}")
-
-    metadata = {
-        "filename": file_name,
-        "content_type": file.content_type,
-        "uploaded_at": datetime.utcnow().isoformat() + "Z",
-    }
-
-    file_metadata.append(metadata)
-    return {"message": "File uploaded successfully", "metadata": metadata}
+        return "Login successful"
+    else:
+        return "Invalid Credentials"
 
 
-@app.get("/file/{file_name}")
-def get_file_link(file_name: str):
-    found = next((f for f in file_metadata if f["filename"] == file_name), None)
-    if not found:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    try:
-        presigned_url = s3_client.generate_presigned_url(
-            ClientMethod='get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': file_name},
-            ExpiresIn=600  # 10 minutes
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating presigned URL: {str(e)}")
-
-    return RedirectResponse(presigned_url)
