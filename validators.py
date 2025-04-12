@@ -21,22 +21,6 @@ class Password:
         return bcrypt.checkpw(password.encode("utf-8"), hash_string.encode("utf-8"))
 
 
-# Example usage
-if __name__ == "__main__":
-    raw_password = "TestPassword"
-
-    # Hash generation
-    hashed = Password.generate_hash(raw_password)
-    print("Hashed:", hashed)
-
-    # Correct password check
-    print("Valid password:", Password.is_valid("TestPassword", hashed))
-
-    # Wrong password check
-    print("Wrong password:", Password.is_valid("wrongPassword", hashed))
-
-
-
 
 class Token:
     @staticmethod
@@ -57,16 +41,4 @@ class Token:
             raise Exception("Token has expired.")
         except InvalidTokenError:
             raise Exception("Token is invalid.")
-
-# Example usage
-if __name__ == "__main__":
-    payload = {"user_id": 123}
-    token = Token.generate(payload, valid_for=5)  # 5 seconds valid
-    print("Generated token:", token)
-
-    time.sleep(2)
-    print("Decoded payload:", Token.get_payload(token))
-
-    time.sleep(4)
-    print("After expiry:", Token.get_payload(token))  # Will raise
 
