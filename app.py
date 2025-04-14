@@ -9,6 +9,9 @@ class VaultInfo(BaseModel):
     vault: str
     password: str
 
+Class FileInfo(BaseModel):
+    
+
 app = FastAPI()
 
 bearer_scheme = HTTPBearer()
@@ -28,7 +31,7 @@ def list_vaults(session = Depends(get_session)):
 @app.post("/vault/create")
 def create_vault(vault_info: VaultInfo, db_session = Depends(get_session)):
     hashed_password = Password.generate_hash(vault_info.password)
-    new_vault = Vault(vault=vault_info.vault, size=500, password_hash=hashed_password)
+    new_vault = Vault(vault=vault_info.vault, size=500*1024*1024, password_hash=hashed_password)
     db_session.add(new_vault)
     try:
         db_session.commit()
