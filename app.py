@@ -33,6 +33,7 @@ def create_vault(vault_info: VaultInfo, db_session = Depends(get_session)):
     try:
         db_session.commit()
     except Exception:
+        db_session.rollback()
         raise HTTPException(status_code=409, detail=f"Vaultname: {vault_info.vault} already exists")
     return {"msg": "vault created successfully"}
 
