@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Response, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
