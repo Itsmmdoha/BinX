@@ -60,7 +60,7 @@ def create_vault(vault_info: VaultInfo, db_session = Depends(get_session)):
     return {"msg": "vault created successfully"}
 
 @app.post("/vault/login")
-def login(response: Response, vault_info: VaultInfo, db_session = Depends(get_session)):
+def login_to_vault(response: Response, vault_info: VaultInfo, db_session = Depends(get_session)):
     vault = db_session.query(Vault).filter(Vault.vault == vault_info.vault).first()
     if vault and Password.is_valid(password=vault_info.password, hash_string=vault.password_hash):
         payload = {"vault": vault.vault}
@@ -70,13 +70,13 @@ def login(response: Response, vault_info: VaultInfo, db_session = Depends(get_se
         raise HTTPException(status_code=401, detail="Invalid Credentials")
 
 @app.get("/vault/fetch")
-def fetch_file_list(token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+def fetch_file_list_from_vault(token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
     files = db_session.query(file_table).filter(file_table.vault == vault_name).all()
     return files
 
 @app.post("/file/upload")
-async def file_upload(token_payload: dict = Depends(get_token_payload), db_session=Depends(get_session), file: UploadFile = File(...)):
+async def upload_file(token_payload: dict = Depends(get_token_payload), db_session=Depends(get_session), file: UploadFile = File(...)):
     vault_name = token_payload.get("vault")
     file_name = file.filename
     # Get file size without loading file into memory
@@ -113,7 +113,7 @@ async def file_upload(token_payload: dict = Depends(get_token_payload), db_sessi
     return {"message": "File uploaded successfully"}
 
 @app.get("/file/download/{file_name}")
-async def file_download(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+async def download_file(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file== file_name).first()
     if not file:
@@ -133,7 +133,7 @@ async def file_download(file_name: str, token_payload: dict = Depends(get_token_
     return {"download_url": presigned_url, "valid_for_seconds":valid_for}
     
 @app.get("/file/delete/{file_name}")
-async def file_delete(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+async def delete_file(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file== file_name).first()
     if file:
