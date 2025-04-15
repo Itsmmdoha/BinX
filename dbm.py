@@ -17,8 +17,9 @@ class Vault(Base):
     __tablename__ = "vaults"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     vault: Mapped[str] = mapped_column(unique=True)
-    size: Mapped[int] # Size in Megabytes
     password_hash: Mapped[str] = mapped_column(String(60))
+    size: Mapped[int] = mapped_column(default=500 * 1024 * 1024) # Size in bytes, default is 500 MB
+    used_storage: Mapped[int] = mapped_column(default=0)
 
     def __repr__(self) -> str:
         return f"Vault(id={self.id!r}, vault={self.vault!r}, size={self.size}, password_hash={self.password_hash!r})"
@@ -28,7 +29,7 @@ class File(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     vault: Mapped[str] 
     file: Mapped[str] 
-    size: Mapped[int] # Size in Megabytes
+    size: Mapped[int] # Size in bytes
     date_created: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 

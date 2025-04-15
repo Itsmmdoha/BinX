@@ -50,7 +50,7 @@ def list_vaults(session = Depends(get_session)):
 @app.post("/vault/create")
 def create_vault(vault_info: VaultInfo, db_session = Depends(get_session)):
     hashed_password = Password.generate_hash(vault_info.password)
-    new_vault = Vault(vault=vault_info.vault, size=500*1024*1024, password_hash=hashed_password)
+    new_vault = Vault(vault=vault_info.vault, password_hash=hashed_password)
     db_session.add(new_vault)
     try:
         db_session.commit()
@@ -79,11 +79,22 @@ def fetch_file_list(token_payload: dict = Depends(get_token_payload), db_session
 async def file_upload(token_payload: dict = Depends(get_token_payload), db_session=Depends(get_session), file: UploadFile = File(...)):
     vault_name = token_payload.get("vault")
     file_name = file.filename
+    # Get file size without loading file into memory
+    file.file.seek(0, 2)  
+    file_size = file.file.tell()
+    file.file.seek(0)  
+
+    vault = db_session.query(Vault).filter(Vault.vault==vault_name).first()
+    vault_size = vault.size
+    used_storage = vault.used_storage
+    if (used_storage + file_size) > vault_size:
+        return {"message": "not enough storage, please delete some files and try again"}
+
     try:
-        # Get file size without loading file into memory
-        file.file.seek(0, 2)  
-        file_size = file.file.tell()
-        file.file.seek(0)  
+        # store file metadata
+        new_file = file_table(vault= vault_name, file = file_name, size=file_size)
+        db_session.add(new_file)
+        db_session.commit()
 
         # Run the upload_fileobj via the threadpool and await it
         file_key = str(vault_name) + str(file_name)
@@ -94,15 +105,10 @@ async def file_upload(token_payload: dict = Depends(get_token_payload), db_sessi
             file_key
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload to MinIO: {str(e)}")
-
-    new_file = file_table(vault= vault_name, file = file_name, size=file_size)
-    db_session.add(new_file)
-    try:
-        db_session.commit()
-    except:
+        print(e)
         db_session.rollback()
-        return HTTPException(status_code=500, details="file upload failed")
+        raise HTTPException(status_code=500, detail="File Upload Failed")
+
     return {"message": "File uploaded successfully"}
 
 @app.get("/file/download/{file_name}")
