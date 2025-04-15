@@ -109,7 +109,7 @@ async def file_upload(token_payload: dict = Depends(get_token_payload), db_sessi
 @app.get("/file/download/{file_name}")
 async def file_download(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
-    file = db_session.query(file_table).filter(file_table.vault == vault_name and file_table.file== file_name).first()
+    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file== file_name).first()
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
@@ -128,12 +128,12 @@ async def file_download(file_name: str, token_payload: dict = Depends(get_token_
 @app.get("/file/delete/{file_name}")
 async def file_delete(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
-    file = db_session.query(file_table).filter(file_table.vault == vault_name and file_table.file== file_name).first()
+    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file== file_name).first()
     if file:
         db_session.delete(file)
         db_session.commit()
-        return file
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=vault_name + file_name)
+        return {"message":"file deleted successfully"}
     else:
-        return file
         raise HTTPException(status_code=404, detail="File not found")
 
