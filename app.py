@@ -81,8 +81,8 @@ def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(bearer
 def list_vaults(session = Depends(get_session)):
     return session.query(Vault).all()
 
-@app.post(
-    "/vault/create",
+@app.post("/vault/create",
+    tags=["Vault Operations"],
     response_model=SuccessModel,
     responses={
         409: {"model": ErrorModel}
@@ -100,6 +100,7 @@ def create_vault(vault_credentials: VaultCredentials, db_session = Depends(get_s
     return {"message": "vault created successfully"}
 
 @app.post("/vault/login",
+    tags=["Vault Operations"],
     response_model=LoginSuccessModel, 
     responses={
         401: {"model": ErrorModel}
@@ -115,6 +116,7 @@ def login_to_vault(vault_credentials: VaultCredentials, db_session = Depends(get
         raise HTTPException(status_code=401, detail="Invalid Credentials")
 
 @app.get("/vault/fetch",
+    tags=["Vault Operations"],
     response_model=vaultModel,
     responses={
         401: {"model": ErrorModel},
@@ -128,6 +130,7 @@ def fetch_file_list_from_vault(token_payload: dict = Depends(get_token_payload),
     return {"vault": vault, "files": files}
 
 @app.post("/file/upload",
+    tags=["File Operations"],
     response_model=SuccessModel,
     responses={
         401: {"model": ErrorModel},
@@ -172,6 +175,7 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
     return {"message": "File uploaded successfully"}
 
 @app.get("/file/download/{file_name}",
+    tags=["File Operations"],
     response_model=DownloadModel,
     responses={
         401: {"model": ErrorModel},
@@ -200,6 +204,7 @@ async def download_file(file_name: str, token_payload: dict = Depends(get_token_
     return {"download_url": presigned_url, "valid_for_seconds":valid_for}
     
 @app.get("/file/delete/{file_name}",
+    tags=["File Operations"],
     response_model=SuccessModel,
     responses={
         401: {"model": ErrorModel},
