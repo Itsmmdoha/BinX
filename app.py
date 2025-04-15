@@ -9,11 +9,19 @@ from typing import List
 from dbm import Vault, File as file_table, get_session
 from auth_helper import Password, Token
 
-class VaultInfo(BaseModel):
+class VaultCredentials(BaseModel):
     vault: str
     password: str
 
 # Response Models
+class VaultInfoModel(BaseModel):
+    vault: str
+    date_created: datetime
+    size: int
+    used_storage: int
+    class Config:
+        orm_mode = True
+        
 class FileModel(BaseModel):
     file: str
     size: int
@@ -21,13 +29,17 @@ class FileModel(BaseModel):
     class Config:
         orm_mode = True
 
+class vaultModel(BaseModel):
+    vault: VaultInfoModel
+    files: List[FileModel]
+
 class SuccessModel(BaseModel):
     message: str
 class ErrorModel(BaseModel):
     detail: str
 class LoginSuccessModel(BaseModel):
     message: str
-    token: str
+    access_token: str
     token_type: str
 class DownloadModel(BaseModel):
     download_url: str
@@ -76,9 +88,9 @@ def list_vaults(session = Depends(get_session)):
         409: {"model": ErrorModel}
     }
 )
-def create_vault(vault_info: VaultInfo, db_session = Depends(get_session)):
-    hashed_password = Password.generate_hash(vault_info.password)
-    new_vault = Vault(vault=vault_info.vault, password_hash=hashed_password)
+def create_vault(vault_credentials: VaultCredentials, db_session = Depends(get_session)):
+    hashed_password = Password.generate_hash(vault_credentials.password)
+    new_vault = Vault(vault=vault_credentials.vault, password_hash=hashed_password)
     db_session.add(new_vault)
     try:
         db_session.commit()
@@ -93,9 +105,9 @@ def create_vault(vault_info: VaultInfo, db_session = Depends(get_session)):
         401: {"model": ErrorModel}
     }
 )
-def login_to_vault(response: Response, vault_info: VaultInfo, db_session = Depends(get_session)):
-    vault = db_session.query(Vault).filter(Vault.vault == vault_info.vault).first()
-    if vault and Password.is_valid(password=vault_info.password, hash_string=vault.password_hash):
+def login_to_vault(vault_credentials: VaultCredentials, db_session = Depends(get_session)):
+    vault = db_session.query(Vault).filter(Vault.vault == vault_credentials.vault).first()
+    if vault and Password.is_valid(password=vault_credentials.password, hash_string=vault.password_hash):
         payload = {"vault": vault.vault}
         token = Token.generate(payload, valid_for=12*3600)
         return {"message": "login successful", "access_token": token, "token_type": "bearer"}
@@ -103,7 +115,7 @@ def login_to_vault(response: Response, vault_info: VaultInfo, db_session = Depen
         raise HTTPException(status_code=401, detail="Invalid Credentials")
 
 @app.get("/vault/fetch",
-    response_model=List[FileModel],
+    response_model=vaultModel,
     responses={
         401: {"model": ErrorModel},
         403: {"model": ErrorModel}
@@ -111,8 +123,9 @@ def login_to_vault(response: Response, vault_info: VaultInfo, db_session = Depen
 )
 def fetch_file_list_from_vault(token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
+    vault = db_session.query(Vault).filter(Vault.vault==vault_name).first()
     files = db_session.query(file_table).filter(file_table.vault == vault_name).all()
-    return files
+    return {"vault": vault, "files": files}
 
 @app.post("/file/upload",
     response_model=SuccessModel,
