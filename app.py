@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Depends, HTTPException, Response, UploadFile, File
-from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
@@ -113,17 +112,18 @@ async def file_download(file_name: str, token_payload: dict = Depends(get_token_
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
+    valid_for = 60*10 # 10 minutes
     try:
         presigned_url = s3_client.generate_presigned_url(
             ClientMethod='get_object',
             Params={'Bucket': BUCKET_NAME, 'Key': vault_name + file_name},
-            ExpiresIn=600  # 10 minutes
+            ExpiresIn= valid_for
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating presigned URL: {str(e)}")
 
     print(presigned_url)
-    return RedirectResponse(presigned_url)
+    return {"download_url": presigned_url, "valid_for_seconds":valid_for}
     
 @app.get("/file/delete/{file_name}")
 async def file_delete(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
