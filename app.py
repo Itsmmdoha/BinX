@@ -3,6 +3,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 import boto3
+from datetime import datetime
+from typing import List
 
 from dbm import Vault, File as file_table, get_session
 from auth_helper import Password, Token
@@ -10,6 +12,26 @@ from auth_helper import Password, Token
 class VaultInfo(BaseModel):
     vault: str
     password: str
+
+# Response Models
+class FileModel(BaseModel):
+    file: str
+    size: int
+    date_created: datetime
+    class Config:
+        orm_mode = True
+
+class SuccessModel(BaseModel):
+    message: str
+class ErrorModel(BaseModel):
+    detail: str
+class LoginSuccessModel(BaseModel):
+    message: str
+    token: str
+    token_type: str
+class DownloadModel(BaseModel):
+    download_url: str
+    valid_for_seconds: int
 
 
 app = FastAPI()
@@ -41,13 +63,19 @@ def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(bearer
         payload = Token.get_payload(token)
         return payload
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Invalid or Expired Token")
 
 @app.get("/")
 def list_vaults(session = Depends(get_session)):
     return session.query(Vault).all()
 
-@app.post("/vault/create")
+@app.post(
+    "/vault/create",
+    response_model=SuccessModel,
+    responses={
+        409: {"model": ErrorModel}
+    }
+)
 def create_vault(vault_info: VaultInfo, db_session = Depends(get_session)):
     hashed_password = Password.generate_hash(vault_info.password)
     new_vault = Vault(vault=vault_info.vault, password_hash=hashed_password)
@@ -57,9 +85,14 @@ def create_vault(vault_info: VaultInfo, db_session = Depends(get_session)):
     except Exception:
         db_session.rollback()
         raise HTTPException(status_code=409, detail=f"Already exists")
-    return {"msg": "vault created successfully"}
+    return {"message": "vault created successfully"}
 
-@app.post("/vault/login")
+@app.post("/vault/login",
+    response_model=LoginSuccessModel, 
+    responses={
+        401: {"model": ErrorModel}
+    }
+)
 def login_to_vault(response: Response, vault_info: VaultInfo, db_session = Depends(get_session)):
     vault = db_session.query(Vault).filter(Vault.vault == vault_info.vault).first()
     if vault and Password.is_valid(password=vault_info.password, hash_string=vault.password_hash):
@@ -69,13 +102,26 @@ def login_to_vault(response: Response, vault_info: VaultInfo, db_session = Depen
     else:
         raise HTTPException(status_code=401, detail="Invalid Credentials")
 
-@app.get("/vault/fetch")
+@app.get("/vault/fetch",
+    response_model=List[FileModel],
+    responses={
+        401: {"model": ErrorModel},
+        403: {"model": ErrorModel}
+    }
+)
 def fetch_file_list_from_vault(token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
     files = db_session.query(file_table).filter(file_table.vault == vault_name).all()
     return files
 
-@app.post("/file/upload")
+@app.post("/file/upload",
+    response_model=SuccessModel,
+    responses={
+        401: {"model": ErrorModel},
+        403: {"model": ErrorModel},
+        500: {"model": ErrorModel}
+    }
+)
 async def upload_file(token_payload: dict = Depends(get_token_payload), db_session=Depends(get_session), file: UploadFile = File(...)):
     vault_name = token_payload.get("vault")
     file_name = file.filename
@@ -112,7 +158,15 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
 
     return {"message": "File uploaded successfully"}
 
-@app.get("/file/download/{file_name}")
+@app.get("/file/download/{file_name}",
+    response_model=DownloadModel,
+    responses={
+        401: {"model": ErrorModel},
+        403: {"model": ErrorModel},
+        404: {"model": ErrorModel},
+        500: {"model": ErrorModel}
+    }
+)
 async def download_file(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file== file_name).first()
@@ -126,13 +180,20 @@ async def download_file(file_name: str, token_payload: dict = Depends(get_token_
             Params={'Bucket': BUCKET_NAME, 'Key': vault_name + file_name},
             ExpiresIn= valid_for
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating presigned URL: {str(e)}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error Generating Download Link}")
 
     print(presigned_url)
     return {"download_url": presigned_url, "valid_for_seconds":valid_for}
     
-@app.get("/file/delete/{file_name}")
+@app.get("/file/delete/{file_name}",
+    response_model=SuccessModel,
+    responses={
+        401: {"model": ErrorModel},
+        403: {"model": ErrorModel},
+        404: {"model": ErrorModel},
+    }
+)
 async def delete_file(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file== file_name).first()
