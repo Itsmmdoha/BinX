@@ -17,6 +17,7 @@ class Vault(Base):
     __tablename__ = "vaults"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     vault: Mapped[str] = mapped_column(unique=True)
+    date_created: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     password_hash: Mapped[str] = mapped_column(String(60))
     size: Mapped[int] = mapped_column(default=500 * 1024 * 1024) # Size in bytes, default is 500 MB
     used_storage: Mapped[int] = mapped_column(default=0)
