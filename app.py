@@ -94,6 +94,7 @@ async def file_upload(token_payload: dict = Depends(get_token_payload), db_sessi
         # store file metadata
         new_file = file_table(vault= vault_name, file = file_name, size=file_size)
         db_session.add(new_file)
+        vault.used_storage += file_size
         db_session.commit()
 
         # Run the upload_fileobj via the threadpool and await it
@@ -137,6 +138,8 @@ async def file_delete(file_name: str, token_payload: dict = Depends(get_token_pa
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file== file_name).first()
     if file:
         db_session.delete(file)
+        vault = db_session.query(Vault).filter(Vault.vault == vault_name).first()
+        vault.used_storage-=file.size
         db_session.commit()
         s3_client.delete_object(Bucket=BUCKET_NAME, Key=vault_name + file_name)
         return {"message":"file deleted successfully"}
