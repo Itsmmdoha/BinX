@@ -1,6 +1,7 @@
 # Binx API
 
-Binx is an API designed to provide a simple and secure file storage system. The front end is under development, and this project currently focuses on the backend API, which allows users to create vaults, upload and download files, and manage their storage. Binx focuses on simplicity. The user just provides  a `vult name` and a `password` for the vault that's it, not emails no data, no strings attached.
+Binx is an API designed to provide a simple and secure file storage system. The front end is under development, and this project currently focuses on the backend API, which allows users to create vaults, upload and download files, and manage their storage. Binx focuses on simplicity; users just provide a vault name and a password for the vault—that's it. No emails, no data, no strings attached.
+
 
 **Note**: The API is under constant development, and while it's not fully ready, it's almost there. The frontend will be coming soon!
 
