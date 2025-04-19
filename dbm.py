@@ -8,7 +8,7 @@ from sqlalchemy.orm import mapped_column
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-DATABASE_URL = "sqlite:///example.db"
+DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/binx"
 
 class Base(DeclarativeBase):
     pass

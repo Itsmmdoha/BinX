@@ -12,5 +12,19 @@ services:
       - minio_data:/data
     command: server --console-address ":9001" /data
 
+  db:
+    image: postgres:15
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: binx
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
 volumes:
   minio_data:
+  postgres_data:
