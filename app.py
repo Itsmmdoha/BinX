@@ -51,7 +51,7 @@ app = FastAPI()
 MINIO_ENDPOINT = "localhost:9000"
 ACCESS_KEY = "minioadmin"
 SECRET_KEY = "minioadmin"
-BUCKET_NAME = "uploads"
+BUCKET_NAME = "binx"
 
 s3_client = boto3.client(
     "s3",
