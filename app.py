@@ -10,7 +10,6 @@ from dbm import Vault, File as file_table, get_session
 from auth_helper import Password, Token
 
 from uuid import UUID
-import urllib.parse
 
 class VaultCredentials(BaseModel):
     vault: str
@@ -198,7 +197,7 @@ async def download_file(file_id: str, token_payload: dict = Depends(get_token_pa
     try:
         presigned_url = s3_client.generate_presigned_url(
             ClientMethod='get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': file_id},
+            Params={'Bucket': BUCKET_NAME, 'Key': file_id, 'ResponseContentDisposition': f'attachment; filename="{file.file}"'},
             ExpiresIn= valid_for,
         )
     except Exception:
