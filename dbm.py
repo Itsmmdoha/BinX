@@ -8,6 +8,10 @@ from sqlalchemy.orm import mapped_column
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+import uuid
+import uuid6
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+
 DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/binx"
 
 class Base(DeclarativeBase):
@@ -28,6 +32,12 @@ class Vault(Base):
 class File(Base):
     __tablename__ = "files"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    file_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), 
+        primary_key=True, 
+        default=uuid6.uuid7,
+        unique=True
+    )
     vault: Mapped[str] 
     file: Mapped[str] 
     size: Mapped[int] # Size in bytes
