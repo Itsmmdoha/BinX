@@ -9,6 +9,9 @@ from typing import List
 from dbm import Vault, File as file_table, get_session
 from auth_helper import Password, Token
 
+from uuid import UUID
+import urllib.parse
+
 class VaultCredentials(BaseModel):
     vault: str
     password: str
@@ -22,8 +25,9 @@ class VaultInfoModel(BaseModel):
     class Config:
         orm_mode = True
         
-class FileModel(BaseModel):
+class FileInfo(BaseModel):
     file: str
+    file_id: UUID 
     size: int
     date_created: datetime
     class Config:
@@ -31,7 +35,7 @@ class FileModel(BaseModel):
 
 class vaultModel(BaseModel):
     vault: VaultInfoModel
-    files: List[FileModel]
+    files: List[FileInfo]
 
 class SuccessModel(BaseModel):
     message: str
@@ -160,7 +164,7 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
         db_session.commit()
 
         # Run the upload_fileobj via the threadpool and await it
-        file_key = str(vault_name) + str(file_name)
+        file_key = str(new_file.file_id)
         await run_in_threadpool( 
             s3_client.upload_fileobj,   
             file.file,
@@ -174,7 +178,7 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
 
     return {"message": "File uploaded successfully"}
 
-@app.get("/file/download/{file_name}",
+@app.get("/file/download/{file_id}",
     tags=["File Operations"],
     response_model=DownloadModel,
     responses={
@@ -184,9 +188,9 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
         500: {"model": ErrorModel}
     }
 )
-async def download_file(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+async def download_file(file_id: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
-    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file== file_name).first()
+    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id==UUID(file_id)).first()
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
@@ -194,8 +198,8 @@ async def download_file(file_name: str, token_payload: dict = Depends(get_token_
     try:
         presigned_url = s3_client.generate_presigned_url(
             ClientMethod='get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': vault_name + file_name},
-            ExpiresIn= valid_for
+            Params={'Bucket': BUCKET_NAME, 'Key': file_id},
+            ExpiresIn= valid_for,
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Error Generating Download Link}")
@@ -203,7 +207,7 @@ async def download_file(file_name: str, token_payload: dict = Depends(get_token_
     print(presigned_url)
     return {"download_url": presigned_url, "valid_for_seconds":valid_for}
     
-@app.get("/file/delete/{file_name}",
+@app.get("/file/delete/{file_id}",
     tags=["File Operations"],
     response_model=SuccessModel,
     responses={
@@ -212,15 +216,15 @@ async def download_file(file_name: str, token_payload: dict = Depends(get_token_
         404: {"model": ErrorModel},
     }
 )
-async def delete_file(file_name: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+async def delete_file(file_id: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
-    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file== file_name).first()
+    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== UUID(file_id)).first()
     if file:
         db_session.delete(file)
         vault = db_session.query(Vault).filter(Vault.vault == vault_name).first()
         vault.used_storage-=file.size
         db_session.commit()
-        s3_client.delete_object(Bucket=BUCKET_NAME, Key=vault_name + file_name)
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=file_id)
         return {"message":"file deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="File not found")
