@@ -15,6 +15,9 @@ class VaultCredentials(BaseModel):
     vault: str
     password: str
 
+class RenameModel(BaseModel):
+    new_name: str
+
 # Response Models
 class VaultInfoModel(BaseModel):
     vault: str
@@ -177,7 +180,7 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
 
     return {"message": "File uploaded successfully"}
 
-@app.get("/file/download/{file_id}",
+@app.get("/file/{file_id}",
     tags=["File Operations"],
     response_model=DownloadModel,
     responses={
@@ -205,8 +208,31 @@ async def download_file(file_id: str, token_payload: dict = Depends(get_token_pa
 
     print(presigned_url)
     return {"download_url": presigned_url, "valid_for_seconds":valid_for}
-    
-@app.get("/file/delete/{file_id}",
+
+@app.put("/file/{file_id}",
+    tags=["File Operations"],
+    response_model=SuccessModel,
+    responses={
+        401: {"model": ErrorModel},
+        403: {"model": ErrorModel},
+        404: {"model": ErrorModel},
+    }
+)
+async def rename_file(file_id: str, rename_data: RenameModel, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+    vault_name = token_payload.get("vault")
+    new_name = rename_data.new_name
+    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== UUID(file_id)).first()
+    if file:
+        file.file = new_name
+        db_session.commit()
+        return {"message":"file renamed successfully"}
+    else:
+        db_session.rollback()
+        raise HTTPException(status_code=404, detail="File not found")
+
+
+
+@app.delete("/file/{file_id}",
     tags=["File Operations"],
     response_model=SuccessModel,
     responses={
