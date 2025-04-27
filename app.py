@@ -192,7 +192,7 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
 )
 async def download_file(file_id: UUID, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
-    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id==UUID(file_id)).first()
+    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id==file_id).first()
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
@@ -200,7 +200,7 @@ async def download_file(file_id: UUID, token_payload: dict = Depends(get_token_p
     try:
         presigned_url = s3_client.generate_presigned_url(
             ClientMethod='get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': file_id, 'ResponseContentDisposition': f'attachment; filename="{file.file}"'},
+            Params={'Bucket': BUCKET_NAME, 'Key': str(file_id), 'ResponseContentDisposition': f'attachment; filename="{file.file}"'},
             ExpiresIn= valid_for,
         )
     except Exception:
@@ -221,7 +221,7 @@ async def download_file(file_id: UUID, token_payload: dict = Depends(get_token_p
 async def rename_file(file_id: UUID, rename_data: RenameModel, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
     new_name = rename_data.new_name
-    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== UUID(file_id)).first()
+    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== file_id).first()
     if file:
         file.file = new_name
         db_session.commit()
@@ -243,13 +243,13 @@ async def rename_file(file_id: UUID, rename_data: RenameModel, token_payload: di
 )
 async def delete_file(file_id: UUID, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
-    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== UUID(file_id)).first()
+    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== file_id).first()
     if file:
         db_session.delete(file)
         vault = db_session.query(Vault).filter(Vault.vault == vault_name).first()
         vault.used_storage-=file.size
         db_session.commit()
-        s3_client.delete_object(Bucket=BUCKET_NAME, Key=file_id)
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=str(file_id))
         return {"message":"file deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="File not found")
