@@ -190,7 +190,7 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
         500: {"model": ErrorModel}
     }
 )
-async def download_file(file_id: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+async def download_file(file_id: UUID, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id==UUID(file_id)).first()
     if not file:
@@ -218,7 +218,7 @@ async def download_file(file_id: str, token_payload: dict = Depends(get_token_pa
         404: {"model": ErrorModel},
     }
 )
-async def rename_file(file_id: str, rename_data: RenameModel, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+async def rename_file(file_id: UUID, rename_data: RenameModel, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
     new_name = rename_data.new_name
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== UUID(file_id)).first()
@@ -241,7 +241,7 @@ async def rename_file(file_id: str, rename_data: RenameModel, token_payload: dic
         404: {"model": ErrorModel},
     }
 )
-async def delete_file(file_id: str, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+async def delete_file(file_id: UUID, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== UUID(file_id)).first()
     if file:
