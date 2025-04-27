@@ -38,6 +38,7 @@ class File(Base):
         default=uuid6.uuid7,
         unique=True
     )
+    visibility: Mapped[str] = mapped_column(default="private")
     vault: Mapped[str] 
     file: Mapped[str] 
     size: Mapped[int] # Size in bytes

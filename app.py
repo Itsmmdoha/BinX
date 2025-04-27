@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.concurrency import run_in_threadpool
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import boto3
 from datetime import datetime
-from typing import List
+from typing import List, Literal, Optional
 
 from dbm import Vault, File as file_table, get_session
 from auth_helper import Password, Token
@@ -15,9 +15,12 @@ class VaultCredentials(BaseModel):
     vault: str
     password: str
 
-class RenameModel(BaseModel):
-    new_name: str
+class FileUpdateModel(BaseModel):
+    new_name: Optional[str] = Field(None, description="New file name")
+    visibility: Optional[Literal["private", "public"]] = Field(None, description="File visibility")
 
+class FileVisibilityUpdate(BaseModel):
+    visibility: Literal["private", "public"]
 # Response Models
 class VaultInfoModel(BaseModel):
     vault: str
@@ -135,6 +138,23 @@ def fetch_file_list_from_vault(token_payload: dict = Depends(get_token_payload),
     files = db_session.query(file_table).filter(file_table.vault == vault_name).all()
     return {"vault": vault, "files": files}
 
+@app.get("/{vault_name}/fetch",
+    tags=["Vault Operations"],
+    response_model=vaultModel,
+    responses={
+        401: {"model": ErrorModel},
+        403: {"model": ErrorModel},
+        404: {"model": ErrorModel}
+    }
+)
+def fetch_public_file_list_from_vault(vault_name: str, db_session = Depends(get_session)):
+    vault = db_session.query(Vault).filter(Vault.vault==vault_name).first()
+    if not vault:
+        raise HTTPException(status_code=404, detail="Vault not found")
+    files = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.visibility == "public").all()
+    return {"vault": vault, "files": files}
+
+
 @app.post("/file/upload",
     tags=["File Operations"],
     response_model=SuccessModel,
@@ -218,18 +238,19 @@ async def download_file(file_id: UUID, token_payload: dict = Depends(get_token_p
         404: {"model": ErrorModel},
     }
 )
-async def rename_file(file_id: UUID, rename_data: RenameModel, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+async def update_file(file_id: UUID, update_data: FileUpdateModel, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
-    new_name = rename_data.new_name
-    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== file_id).first()
+    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id == file_id).first()
     if file:
-        file.file = new_name
+        if update_data.new_name is not None:
+            file.file = update_data.new_name
+        if update_data.visibility is not None:
+            file.visibility = update_data.visibility
         db_session.commit()
-        return {"message":"file renamed successfully"}
+        return {"message": "File updated successfully"}
     else:
         db_session.rollback()
         raise HTTPException(status_code=404, detail="File not found")
-
 
 
 @app.delete("/file/{file_id}",
