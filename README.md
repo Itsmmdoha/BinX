@@ -226,7 +226,7 @@ This will launch:
 Once the dependencies and services are set up, start the FastAPI development server:
 
 ```bash
-uvicorn main:app --reload
+uvicorn app:app --reload
 ```
 
 Access the API documentation via:
