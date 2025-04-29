@@ -243,7 +243,7 @@ async def download_file(file_id: UUID, token_payload: dict = Depends(get_token_p
     }
 )
 async def update_file(file_id: UUID, update_data: FileUpdateModel, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
-    if token_payload.get("user") != "uwner":
+    if token_payload.get("user") != "owner":
         raise HTTPException(status_code=403, detail="Forbidden Operation")
     vault_name = token_payload.get("vault")
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id == file_id).first()
@@ -269,7 +269,7 @@ async def update_file(file_id: UUID, update_data: FileUpdateModel, token_payload
     }
 )
 async def delete_file(file_id: UUID, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
-    if token_payload.get("user") != "uwner":
+    if token_payload.get("user") != "owner":
         raise HTTPException(status_code=403, detail="Forbidden Operation")
     vault_name = token_payload.get("vault")
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== file_id).first()
