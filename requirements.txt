@@ -28,6 +28,7 @@ starlette==0.46.2
 typing-inspection==0.4.0
 typing_extensions==4.13.2
 urllib3==2.4.0
+uuid6==2024.7.10
 uvicorn==0.34.2
 uvloop==0.21.0
 watchfiles==1.0.5

@@ -11,9 +11,13 @@ from auth_helper import Password, Token
 
 from uuid import UUID
 
-class VaultCredentials(BaseModel):
+class VaultCreateCredentials(BaseModel):
     vault: str
     password: str
+
+class VaultLoginCredentials(BaseModel):
+    vault: str
+    password: Optional[str] = Field(None, description="Password for the vault, if provided, logs in as owner, otherwise guest.")
 
 class FileUpdateModel(BaseModel):
     new_name: Optional[str] = Field(None, description="New file name")
@@ -97,7 +101,7 @@ def list_vaults(session = Depends(get_session)):
         409: {"model": ErrorModel}
     }
 )
-def create_vault(vault_credentials: VaultCredentials, db_session = Depends(get_session)):
+def create_vault(vault_credentials: VaultCreateCredentials, db_session = Depends(get_session)):
     hashed_password = Password.generate_hash(vault_credentials.password)
     new_vault = Vault(vault=vault_credentials.vault, password_hash=hashed_password)
     db_session.add(new_vault)
@@ -112,15 +116,22 @@ def create_vault(vault_credentials: VaultCredentials, db_session = Depends(get_s
     tags=["Vault Operations"],
     response_model=LoginSuccessModel, 
     responses={
-        401: {"model": ErrorModel}
+        401: {"model": ErrorModel},
+        404: {"model": ErrorModel}
     }
 )
-def login_to_vault(vault_credentials: VaultCredentials, db_session = Depends(get_session)):
+def login_to_vault(vault_credentials: VaultLoginCredentials, db_session = Depends(get_session)):
     vault = db_session.query(Vault).filter(Vault.vault == vault_credentials.vault).first()
-    if vault and Password.is_valid(password=vault_credentials.password, hash_string=vault.password_hash):
-        payload = {"vault": vault.vault}
+    if not vault:
+        raise HTTPException(status_code=404, detail="Vault Not Found")
+    elif vault_credentials.password is None:
+        payload = {"vault": vault.vault, "user":"guest"}
         token = Token.generate(payload, valid_for=12*3600)
-        return {"message": "login successful", "access_token": token, "token_type": "bearer"}
+        return {"message": "Login as guest successful", "access_token": token, "token_type": "bearer"}
+    elif Password.is_valid(password=vault_credentials.password, hash_string=vault.password_hash):
+        payload = {"vault": vault.vault, "user":"owner"}
+        token = Token.generate(payload, valid_for=12*3600)
+        return {"message": "Login successful", "access_token": token, "token_type": "bearer"}
     else:
         raise HTTPException(status_code=401, detail="Invalid Credentials")
 
@@ -134,25 +145,15 @@ def login_to_vault(vault_credentials: VaultCredentials, db_session = Depends(get
 )
 def fetch_file_list_from_vault(token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
+    user = token_payload.get("user")
     vault = db_session.query(Vault).filter(Vault.vault==vault_name).first()
-    files = db_session.query(file_table).filter(file_table.vault == vault_name).all()
+    files = db_session.query(file_table)
+    if user == "guest":
+        files= files.filter(file_table.vault == vault_name, file_table.visibility == "public").all()
+    elif user == "owner":
+        files= files.filter(file_table.vault == vault_name, file_table.visibility == "public", file_table.visibility==private).all()
     return {"vault": vault, "files": files}
 
-@app.get("/{vault_name}/fetch",
-    tags=["Vault Operations"],
-    response_model=vaultModel,
-    responses={
-        401: {"model": ErrorModel},
-        403: {"model": ErrorModel},
-        404: {"model": ErrorModel}
-    }
-)
-def fetch_public_file_list_from_vault(vault_name: str, db_session = Depends(get_session)):
-    vault = db_session.query(Vault).filter(Vault.vault==vault_name).first()
-    if not vault:
-        raise HTTPException(status_code=404, detail="Vault not found")
-    files = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.visibility == "public").all()
-    return {"vault": vault, "files": files}
 
 
 @app.post("/file/upload",
@@ -165,6 +166,8 @@ def fetch_public_file_list_from_vault(vault_name: str, db_session = Depends(get_
     }
 )
 async def upload_file(token_payload: dict = Depends(get_token_payload), db_session=Depends(get_session), file: UploadFile = File(...)):
+    if token_payload.get("user") != "uwner":
+        raise HTTPException(status_code=403, detail="Forbidden Operation")
     vault_name = token_payload.get("vault")
     file_name = file.filename
     # Get file size without loading file into memory
@@ -212,7 +215,8 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
 )
 async def download_file(file_id: UUID, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
     vault_name = token_payload.get("vault")
-    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id==file_id).first()
+    files = db_session.query(file_table)
+    file = files.filter(file_table.vault == vault_name, file_table.file_id==file_id).first()
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
@@ -239,6 +243,8 @@ async def download_file(file_id: UUID, token_payload: dict = Depends(get_token_p
     }
 )
 async def update_file(file_id: UUID, update_data: FileUpdateModel, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+    if token_payload.get("user") != "uwner":
+        raise HTTPException(status_code=403, detail="Forbidden Operation")
     vault_name = token_payload.get("vault")
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id == file_id).first()
     if file:
@@ -263,6 +269,8 @@ async def update_file(file_id: UUID, update_data: FileUpdateModel, token_payload
     }
 )
 async def delete_file(file_id: UUID, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+    if token_payload.get("user") != "uwner":
+        raise HTTPException(status_code=403, detail="Forbidden Operation")
     vault_name = token_payload.get("vault")
     file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== file_id).first()
     if file:
