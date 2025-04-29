@@ -166,7 +166,7 @@ def fetch_file_list_from_vault(token_payload: dict = Depends(get_token_payload),
     }
 )
 async def upload_file(token_payload: dict = Depends(get_token_payload), db_session=Depends(get_session), file: UploadFile = File(...)):
-    if token_payload.get("user") != "uwner":
+    if token_payload.get("user") != "owner":
         raise HTTPException(status_code=403, detail="Forbidden Operation")
     vault_name = token_payload.get("vault")
     file_name = file.filename
