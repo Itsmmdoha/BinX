@@ -151,7 +151,7 @@ def fetch_file_list_from_vault(token_payload: dict = Depends(get_token_payload),
     if user == "guest":
         files= files.filter(file_table.vault == vault_name, file_table.visibility == "public").all()
     elif user == "owner":
-        files= files.filter(file_table.vault == vault_name, file_table.visibility == "public", file_table.visibility==private).all()
+        files= files.filter(file_table.vault == vault_name, file_table.visibility == "public", file_table.visibility=="private").all()
     return {"vault": vault, "files": files}
 
 
