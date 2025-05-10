@@ -4,7 +4,8 @@ from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 import boto3
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import List, Optional
+from enum import Enum
 
 from dbm import Vault, File as file_table, get_session
 from auth_helper import Password, Token
@@ -19,12 +20,14 @@ class VaultLoginCredentials(BaseModel):
     vault: str
     password: Optional[str] = Field(None, description="Password for the vault, if provided, logs in as owner, otherwise guest.")
 
+
+class Visibility(str, Enum):
+    PRIVATE = "private"
+    PUBLIC = "public"
 class FileUpdateModel(BaseModel):
     new_name: Optional[str] = Field(None, description="New file name")
-    visibility: Optional[Literal["private", "public"]] = Field(None, description="File visibility")
+    visibility: Optional[Visibility] = Field(None, description="File visibility")
 
-class FileVisibilityUpdate(BaseModel):
-    visibility: Literal["private", "public"]
 # Response Models
 class VaultInfoModel(BaseModel):
     vault: str
