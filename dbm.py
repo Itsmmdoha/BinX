@@ -7,6 +7,7 @@ from sqlalchemy.orm import mapped_column
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 import uuid
 import uuid6
@@ -67,10 +68,14 @@ if __name__ == "__main__":
     try:
         session.commit()
     except:
+        pass
+        # Here, log the error
         #if an exception is raised while commiting the data, like constraints(e.g. not unique), or IO failure, the commit is rolled back
-        session.rollback()
+        # session.rollback() - manual rollback is not necessary, the context manager __exit__() method handles it all 
         #then the connection is closed by the context manager(with) 
 
-    print(session.query(Vault).all())
+    stmt = select(Vault)
+    vaults = session.scalar(stmt)
+    print(vaults)
 
 

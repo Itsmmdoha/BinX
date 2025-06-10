@@ -4,11 +4,13 @@ from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 import boto3
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Callable
 from enum import Enum
 
 from dbm import Vault, File as file_table, get_session
+from sqlalchemy import select, and_
 from auth_helper import Password, Token
+
 
 from uuid import UUID
 
@@ -24,6 +26,17 @@ class VaultLoginCredentials(BaseModel):
 class Visibility(str, Enum):
     PRIVATE = "private"
     PUBLIC = "public"
+class Role(str, Enum):
+    OWNER = "owner"
+    GUEST = "guest"
+
+def require_role(required_role: Role) -> Callable:
+    def enforce_role(token_payload: dict = Depends(get_token_payload)):
+        role = token_payload.get("role")
+        if role != required_role:
+            raise HTTPException(status_code=403, detail="Forbidden Operation")
+    return enforce_role
+
 class FileUpdateModel(BaseModel):
     new_name: Optional[str] = Field(None, description="New file name")
     visibility: Optional[Visibility] = Field(None, description="File visibility")
@@ -36,7 +49,7 @@ class VaultInfoModel(BaseModel):
     used_storage: int
     class Config:
         orm_mode = True
-        
+
 class FileInfo(BaseModel):
     file: str
     visibility: Visibility
@@ -105,7 +118,10 @@ def list_vaults(session = Depends(get_session)):
         409: {"model": ErrorModel}
     }
 )
-def create_vault(vault_credentials: VaultCreateCredentials, db_session = Depends(get_session)):
+def create_vault(
+        vault_credentials: VaultCreateCredentials,
+        db_session = Depends(get_session)
+):
     hashed_password = Password.generate_hash(vault_credentials.password)
     new_vault = Vault(vault=vault_credentials.vault, password_hash=hashed_password)
     db_session.add(new_vault)
@@ -121,19 +137,25 @@ def create_vault(vault_credentials: VaultCreateCredentials, db_session = Depends
     response_model=LoginSuccessModel, 
     responses={
         401: {"model": ErrorModel},
-        404: {"model": ErrorModel}
+        404: {"model": ErrorModel},
+        500: {"model": ErrorModel}
     }
 )
-def login_to_vault(vault_credentials: VaultLoginCredentials, db_session = Depends(get_session)):
-    vault = db_session.query(Vault).filter(Vault.vault == vault_credentials.vault).first()
-    if not vault:
+def login_to_vault(
+        vault_credentials: VaultLoginCredentials,
+        db_session = Depends(get_session)
+):
+    stmt = select(Vault).where(Vault.vault == vault_credentials.vault)
+    vault = db_session.scalars(stmt).first()
+
+    if vault is None:
         raise HTTPException(status_code=404, detail="Vault Not Found")
     elif vault_credentials.password is None:
-        payload = {"vault": vault.vault, "user":"guest"}
+        payload = {"vault": vault.vault, "role":"guest"}
         token = Token.generate(payload, valid_for=12*3600)
         return {"message": "Login as guest successful", "access_token": token, "token_type": "bearer"}
     elif Password.is_valid(password=vault_credentials.password, hash_string=vault.password_hash):
-        payload = {"vault": vault.vault, "user":"owner"}
+        payload = {"vault": vault.vault, "role":"owner"}
         token = Token.generate(payload, valid_for=12*3600)
         return {"message": "Login successful", "access_token": token, "token_type": "bearer"}
     else:
@@ -147,15 +169,19 @@ def login_to_vault(vault_credentials: VaultLoginCredentials, db_session = Depend
         403: {"model": ErrorModel}
     }
 )
-def fetch_file_list_from_vault(token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+def fetch_file_list_from_vault(
+        token_payload: dict = Depends(get_token_payload),
+        db_session = Depends(get_session)
+):
     vault_name = token_payload.get("vault")
-    user = token_payload.get("user")
-    vault = db_session.query(Vault).filter(Vault.vault==vault_name).first()
-    files = db_session.query(file_table)
-    if user == "guest":
-        files= files.filter(file_table.vault == vault_name, file_table.visibility == "public").all()
-    elif user == "owner":
-        files= files.filter(file_table.vault == vault_name).all() # All Files, without any filter
+    role = token_payload.get("role")
+    vault = db_session.scalars(select(Vault).where(Vault.vault==vault_name)).first()
+    files_stmt = select(file_table)
+    if role == Role.GUEST:
+        files_stmt = files_stmt.where(and_(file_table.vault == vault_name, file_table.visibility == "public"))
+    elif role == Role.OWNER:
+        files_stmt = files_stmt.where(file_table.vault == vault_name) # All Files, without any filter
+    files = db_session.scalars(files_stmt).all()
     return {"vault": vault, "files": files}
 
 
@@ -169,9 +195,12 @@ def fetch_file_list_from_vault(token_payload: dict = Depends(get_token_payload),
         500: {"model": ErrorModel}
     }
 )
-async def upload_file(token_payload: dict = Depends(get_token_payload), db_session=Depends(get_session), file: UploadFile = File(...)):
-    if token_payload.get("user") != "owner":
-        raise HTTPException(status_code=403, detail="Forbidden Operation")
+async def upload_file(
+        token_payload: dict = Depends(get_token_payload),
+        _: None = Depends(require_role(Role.OWNER)),
+        db_session=Depends(get_session),
+        file: UploadFile = File(...)
+):
     vault_name = token_payload.get("vault")
     file_name = file.filename
     # Get file size without loading file into memory
@@ -179,7 +208,8 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
     file_size = file.file.tell()
     file.file.seek(0)  
 
-    vault = db_session.query(Vault).filter(Vault.vault==vault_name).first()
+    stmt = select(Vault).where(Vault.vault==vault_name)
+    vault = db_session.scalars(stmt).first()
     vault_size = vault.size
     used_storage = vault.used_storage
     if (used_storage + file_size) > vault_size:
@@ -217,11 +247,18 @@ async def upload_file(token_payload: dict = Depends(get_token_payload), db_sessi
         500: {"model": ErrorModel}
     }
 )
-async def download_file(file_id: UUID, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
+async def download_file(
+        file_id: UUID,
+        token_payload: dict = Depends(get_token_payload),
+        db_session = Depends(get_session)
+):
     vault_name = token_payload.get("vault")
-    files = db_session.query(file_table)
-    file = files.filter(file_table.vault == vault_name, file_table.file_id==file_id).first()
-    if not file:
+    role = token_payload.get("role")
+    stmt = select(file_table).where(and_(file_table.vault == vault_name, file_table.file_id==file_id))
+    if role == Role.GUEST:
+        stmt = stmt.where(file_table.visibility == "public") # if role is guest, only allow public files
+    file = db_session.scalars(stmt).first()
+    if file is None:
         raise HTTPException(status_code=404, detail="File not found")
 
     valid_for = 60*10 # 10 minutes
@@ -246,11 +283,16 @@ async def download_file(file_id: UUID, token_payload: dict = Depends(get_token_p
         404: {"model": ErrorModel},
     }
 )
-async def update_file(file_id: UUID, update_data: FileUpdateModel, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
-    if token_payload.get("user") != "owner":
-        raise HTTPException(status_code=403, detail="Forbidden Operation")
+async def update_file(
+        file_id: UUID,
+        update_data: FileUpdateModel,
+        token_payload: dict = Depends(get_token_payload),
+        _: None = Depends(require_role(Role.OWNER)),
+        db_session = Depends(get_session)
+):
     vault_name = token_payload.get("vault")
-    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id == file_id).first()
+    stmt = select(file_table).where(and_(file_table.vault == vault_name, file_table.file_id == file_id))
+    file = db_session.scalars(stmt).first()
     if file:
         if update_data.new_name is not None:
             file.file = update_data.new_name
@@ -259,7 +301,6 @@ async def update_file(file_id: UUID, update_data: FileUpdateModel, token_payload
         db_session.commit()
         return {"message": "File updated successfully"}
     else:
-        db_session.rollback()
         raise HTTPException(status_code=404, detail="File not found")
 
 
@@ -272,14 +313,19 @@ async def update_file(file_id: UUID, update_data: FileUpdateModel, token_payload
         404: {"model": ErrorModel},
     }
 )
-async def delete_file(file_id: UUID, token_payload: dict = Depends(get_token_payload), db_session = Depends(get_session)):
-    if token_payload.get("user") != "owner":
-        raise HTTPException(status_code=403, detail="Forbidden Operation")
+async def delete_file(
+        file_id: UUID,
+        token_payload: dict = Depends(get_token_payload),
+        _: None = Depends(require_role(Role.OWNER)),
+        db_session = Depends(get_session)
+):
     vault_name = token_payload.get("vault")
-    file = db_session.query(file_table).filter(file_table.vault == vault_name, file_table.file_id== file_id).first()
+    stmt = select(file_table).where(and_(file_table.vault == vault_name, file_table.file_id== file_id))
+    file = db_session.scalars(stmt).first()
     if file:
         db_session.delete(file)
-        vault = db_session.query(Vault).filter(Vault.vault == vault_name).first()
+        find_vault_stmt = select(Vault).where(Vault.vault == vault_name)
+        vault = db_session.scalars(find_vault_stmt).first()
         vault.used_storage-=file.size
         db_session.commit()
         s3_client.delete_object(Bucket=BUCKET_NAME, Key=str(file_id))
