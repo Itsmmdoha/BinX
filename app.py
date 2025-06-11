@@ -134,6 +134,18 @@ def create_vault(
 
 @app.post("/vault/login",
     tags=["Vault Operations"],
+    description="""
+Login to a vault in one of two modes:
+
+1. **Guest Mode** – Provides read-only access (view/download) to public files.  
+   To log in as a guest, send only the `vaultname` in the request body.
+
+2. **Owner Mode** – Grants full access including uploading, renaming, changing visibility, and deleting files.  
+   To log in as an owner, send both the `vaultname` and the correct `password`.
+
+If the credentials are valid, a **JWT Bearer Token** will be returned in the response.  
+You must include this token in the `Authorization` header (`Bearer <token>`) to access protected endpoints that support read/write operations.
+""",
     response_model=LoginSuccessModel, 
     responses={
         401: {"model": ErrorModel},
@@ -276,6 +288,16 @@ async def download_file(
 
 @app.put("/file/{file_id}",
     tags=["File Operations"],
+    description="""
+This endpoint allows you to perform the following actions on a file:
+
+1. **Rename a file**  
+2. **Change the file's visibility** (public/private)
+
+- To **rename** the file, include the `new_name` field in the request body.  
+- To **change visibility**, include the `visibility` field (`"public"` or `"private"`) in the request body.  
+- To perform **both actions**, include both attributes in the same request.
+    """,
     response_model=SuccessModel,
     responses={
         401: {"model": ErrorModel},
