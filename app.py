@@ -107,9 +107,6 @@ def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(bearer
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or Expired Token")
 
-@app.get("/")
-def list_vaults(session = Depends(get_session)):
-    return session.query(Vault).all()
 
 @app.post("/vault/create",
     tags=["Vault Operations"],
