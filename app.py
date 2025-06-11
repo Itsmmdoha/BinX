@@ -76,7 +76,7 @@ class DownloadModel(BaseModel):
     valid_for_seconds: int
 
 
-app = FastAPI(title="BinX",version="0.0.1")
+app = FastAPI(title="BinX",version="0.0.1", redoc_url=None)
 
 MINIO_ENDPOINT = "localhost:9000"
 ACCESS_KEY = "minioadmin"
