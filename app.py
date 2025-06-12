@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File as FastAPIFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Optional, Callable
 from enum import Enum
 
-from database import Vault, File as file_table, get_session
+from database import Vault, File, get_session
 from auth import Password, Token
 from sqlalchemy import select, and_
 
@@ -184,11 +184,11 @@ def fetch_file_list_from_vault(
     vault_name = token_payload.get("vault")
     role = token_payload.get("role")
     vault = db_session.scalars(select(Vault).where(Vault.vault==vault_name)).first()
-    files_stmt = select(file_table)
+    files_stmt = select(File)
     if role == Role.GUEST:
-        files_stmt = files_stmt.where(and_(file_table.vault == vault_name, file_table.visibility == "public"))
+        files_stmt = files_stmt.where(and_(File.vault == vault_name, File.visibility == "public"))
     elif role == Role.OWNER:
-        files_stmt = files_stmt.where(file_table.vault == vault_name) # All Files, without any filter
+        files_stmt = files_stmt.where(File.vault == vault_name) # All Files, without any filter
     files = db_session.scalars(files_stmt).all()
     return {"vault": vault, "files": files}
 
@@ -207,7 +207,7 @@ async def upload_file(
         token_payload: dict = Depends(get_token_payload),
         _: None = Depends(require_role(Role.OWNER)),
         db_session=Depends(get_session),
-        file: UploadFile = File(...)
+        file: UploadFile = FastAPIFile(...)
 ):
     vault_name = token_payload.get("vault")
     file_name = file.filename
@@ -225,7 +225,7 @@ async def upload_file(
 
     try:
         # store file metadata
-        new_file = file_table(vault= vault_name, file = file_name, size=file_size)
+        new_file = File(vault= vault_name, file = file_name, size=file_size)
         db_session.add(new_file)
         vault.used_storage += file_size
         db_session.commit()
@@ -262,9 +262,9 @@ async def download_file(
 ):
     vault_name = token_payload.get("vault")
     role = token_payload.get("role")
-    stmt = select(file_table).where(and_(file_table.vault == vault_name, file_table.file_id==file_id))
+    stmt = select(File).where(and_(File.vault == vault_name, File.file_id==file_id))
     if role == Role.GUEST:
-        stmt = stmt.where(file_table.visibility == "public") # if role is guest, only allow public files
+        stmt = stmt.where(File.visibility == "public") # if role is guest, only allow public files
     file = db_session.scalars(stmt).first()
     if file is None:
         raise HTTPException(status_code=404, detail="File not found")
@@ -309,7 +309,7 @@ async def update_file(
         db_session = Depends(get_session)
 ):
     vault_name = token_payload.get("vault")
-    stmt = select(file_table).where(and_(file_table.vault == vault_name, file_table.file_id == file_id))
+    stmt = select(File).where(and_(File.vault == vault_name, File.file_id == file_id))
     file = db_session.scalars(stmt).first()
     if file:
         if update_data.new_name is not None:
@@ -338,7 +338,7 @@ async def delete_file(
         db_session = Depends(get_session)
 ):
     vault_name = token_payload.get("vault")
-    stmt = select(file_table).where(and_(file_table.vault == vault_name, file_table.file_id== file_id))
+    stmt = select(File).where(and_(File.vault == vault_name, File.file_id== file_id))
     file = db_session.scalars(stmt).first()
     if file:
         db_session.delete(file)
