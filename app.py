@@ -7,10 +7,9 @@ from datetime import datetime
 from typing import List, Optional, Callable
 from enum import Enum
 
-from dbm import Vault, File as file_table, get_session
+from database import Vault, File as file_table, get_session
+from auth import Password, Token
 from sqlalchemy import select, and_
-from auth_helper import Password, Token
-
 
 from uuid import UUID
 
