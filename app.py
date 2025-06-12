@@ -1,30 +1,17 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File as FastAPIFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
 import boto3
-from datetime import datetime
-from typing import List, Optional, Callable
+from typing import Callable
 from enum import Enum
 
 from database import Vault, File, get_session
-from auth import Password, Token
 from sqlalchemy import select, and_
-
+from auth import Password, Token
+from models.request import VaultCreateCredentials, VaultLoginCredentials, FileUpdateModel
+from models.response import SuccessModel, ErrorModel, LoginSuccessModel, DownloadModel, VaultModel
 from uuid import UUID
 
-class VaultCreateCredentials(BaseModel):
-    vault: str
-    password: str
-
-class VaultLoginCredentials(BaseModel):
-    vault: str
-    password: Optional[str] = Field(None, description="Password for the vault, if provided, logs in as owner, otherwise guest.")
-
-
-class Visibility(str, Enum):
-    PRIVATE = "private"
-    PUBLIC = "public"
 class Role(str, Enum):
     OWNER = "owner"
     GUEST = "guest"
@@ -35,44 +22,6 @@ def require_role(required_role: Role) -> Callable:
         if role != required_role:
             raise HTTPException(status_code=403, detail="Forbidden Operation")
     return enforce_role
-
-class FileUpdateModel(BaseModel):
-    new_name: Optional[str] = Field(None, description="New file name")
-    visibility: Optional[Visibility] = Field(None, description="File visibility")
-
-# Response Models
-class VaultInfoModel(BaseModel):
-    vault: str
-    date_created: datetime
-    size: int
-    used_storage: int
-    class Config:
-        orm_mode = True
-
-class FileInfo(BaseModel):
-    file: str
-    visibility: Visibility
-    file_id: UUID 
-    size: int
-    date_created: datetime
-    class Config:
-        orm_mode = True
-
-class vaultModel(BaseModel):
-    vault: VaultInfoModel
-    files: List[FileInfo]
-
-class SuccessModel(BaseModel):
-    message: str
-class ErrorModel(BaseModel):
-    detail: str
-class LoginSuccessModel(BaseModel):
-    message: str
-    access_token: str
-    token_type: str
-class DownloadModel(BaseModel):
-    download_url: str
-    valid_for_seconds: int
 
 
 app = FastAPI(title="BinX",version="0.0.1", redoc_url=None)
@@ -171,7 +120,7 @@ def login_to_vault(
 
 @app.get("/vault/fetch",
     tags=["Vault Operations"],
-    response_model=vaultModel,
+    response_model=VaultModel,
     responses={
         401: {"model": ErrorModel},
         403: {"model": ErrorModel}
