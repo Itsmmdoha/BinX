@@ -12,8 +12,8 @@ from sqlalchemy import select
 import uuid
 import uuid6
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from config import DATABASE_URL
 
-DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/binx"
 
 class Base(DeclarativeBase):
     pass

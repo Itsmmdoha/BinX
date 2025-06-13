@@ -4,9 +4,9 @@ import jwt
 import time
 from typing import Dict
 from jwt import ExpiredSignatureError, InvalidTokenError
+from config import JWT_SECRET_KEY
 
 
-SECRET_KEY = "your-secret-key" 
 ALGORITHM = "HS256"
 
 
@@ -30,13 +30,13 @@ class Token:
             **payload,
             "exp": int(time.time()) + valid_for
         }
-        return jwt.encode(payload_with_exp, SECRET_KEY, algorithm=ALGORITHM)
+        return jwt.encode(payload_with_exp, JWT_SECRET_KEY, algorithm=ALGORITHM)
 
     @staticmethod
     def get_payload(token: str) -> Dict:
         """Validates the token, returns payload if valid, raises if invalid or expired."""
         try:
-            return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            return jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
         except ExpiredSignatureError:
             raise Exception("Token has expired.")
         except InvalidTokenError:

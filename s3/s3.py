@@ -1,9 +1,5 @@
 import boto3 
-
-MINIO_ENDPOINT = "localhost:9000"
-ACCESS_KEY = "minioadmin"
-SECRET_KEY = "minioadmin"
-BUCKET_NAME = "binx"
+from config import MINIO_ENDPOINT, ACCESS_KEY, SECRET_KEY, BUCKET_NAME
 
 s3_client = boto3.client(
     "s3",
