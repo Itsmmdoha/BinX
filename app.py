@@ -1,11 +1,11 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File as FastAPIFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.concurrency import run_in_threadpool
-import boto3
 from typing import Callable
 from enum import Enum
 
 from database import Vault, File, get_session
+from s3 import s3_client, create_bucket_if_not_exists, BUCKET_NAME
 from sqlalchemy import select, and_
 from auth import Password, Token
 from models.request import VaultCreateCredentials, VaultLoginCredentials, FileUpdateModel
@@ -26,25 +26,6 @@ def require_role(required_role: Role) -> Callable:
 
 app = FastAPI(title="BinX",version="0.0.1", redoc_url=None)
 
-MINIO_ENDPOINT = "localhost:9000"
-ACCESS_KEY = "minioadmin"
-SECRET_KEY = "minioadmin"
-BUCKET_NAME = "binx"
-
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=f"http://{MINIO_ENDPOINT}",
-    aws_access_key_id=ACCESS_KEY,
-    aws_secret_access_key=SECRET_KEY,
-)
-
-# Ensure bucket exists
-try:
-    s3_client.head_bucket(Bucket=BUCKET_NAME)
-except:
-    s3_client.create_bucket(Bucket=BUCKET_NAME)
-
-
 bearer_scheme = HTTPBearer()
 
 def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
@@ -55,6 +36,7 @@ def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(bearer
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or Expired Token")
 
+create_bucket_if_not_exists()
 
 @app.post("/vault/create",
     tags=["Vault Operations"],
