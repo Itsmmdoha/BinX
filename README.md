@@ -1,221 +1,111 @@
-# Binx API
+# BinX API
 
-**Binx** is a fast, secure, and minimal backend API for file vault management. Users create vaults (with optional guest access), store files in an S3‑compatible bucket, and manage file metadata—no emails, no fuss.
+[![GitHub Repo](https://github.com/Itsmmdoha/BinX)](https://github.com/Itsmmdoha/BinX)
 
-> **Status:** Active development
->
-> * Core features: Vault creation, dual-mode login (guest/owner), file CRUD, visibility controls, storage quotas.
-> * Upcoming: Frontend UI, granular RBAC, audit logging, shareable links.
+BinX is a secure convenience focused file storage service designed for simplicity and speed. Create password-protected vaults to organize and safeguard your files. Access your vaults in two modes:
 
----
+* **Owner**: Authenticate with both vault name and password to view, upload, delete, rename, and change visibility of all files (both `private` & `public`).
+* **Guest**: Authenticate with vault name only to browse and download `public` files in read-only mode.
 
-## 🚀 Features
+With BinX, you can **create vaults**, **log in (as guest or owner)**, **upload files**, **download**, **delete**, **rename**, and **change file visibility**.
 
-* **Vaults**: Create named vaults protected by passwords.
-* **Dual-Mode Login**: Same endpoint returns a JWT as *guest* (read-only public files) or *owner* (full access).
-* **File Operations**:
-
-  * Upload (thread‑pooled S3 client)
-  * Download via presigned URLs (10‑minute expiry)
-  * Rename and update visibility (`public`/`private`)
-  * Delete with automatic storage reclamation
-* **Storage Quota**: Prevent uploads when exceeding per‑vault limits.
-* **Visibility Control**: Owners flag files as `public` or `private` via an Enum.
-
----
 
 ## 🛠️ Tech Stack
 
-| Component       | Technology      |
-| --------------- | --------------- |
-| Framework       | FastAPI         |
-| Validation      | Pydantic        |
-| Database        | PostgreSQL      |
-| ORM             | SQLAlchemy      |
-| Object Storage  | MinIO (S3 API)  |
-| Storage SDK     | Boto3           |
-| Auth & Security | JWT, HTTPBearer |
-
----
-
-## 🔗 API Endpoints
-
-### Auth & Vault
-
-| Method | Path            | Access     | Description                                      |
-| ------ | --------------- | ---------- | ------------------------------------------------ |
-| GET    | `/`             | Public     | List all vaults                                  |
-| POST   | `/vault/create` | Public     | Create vault                                     |
-| POST   | `/vault/login`  | Public     | Login as guest/owner ⇒ returns JWT token         |
-| GET    | `/vault/fetch`  | Bearer JWT | Get vault info + file list (public vs all files) |
-
-#### Create Vault
-
-* **Request Body**:
-
-  ```json
-  { "vault": "myvault", "password": "secret" }
-  ```
-* **Responses**:
-
-  * `200 OK`: `{ "message": "vault created successfully" }`
-  * `409 Conflict`: `{ "detail": "Already exists" }`
-
-#### Login to Vault
-
-* **Request Body** (guest):
-
-  ```json
-  { "vault": "myvault" }
-  ```
-
-* **Request Body** (owner):
-
-  ```json
-  { "vault": "myvault", "password": "secret" }
-  ```
-
-* **Successful Response** (`200 OK`):
-
-  ```json
-  {
-    "message": "Login as guest successful" | "Login successful",
-    "access_token": "<token>",
-    "token_type": "bearer"
-  }
-  ```
-
-* `401 Unauthorized` (bad password)
-
-* `404 Not Found` (vault missing)
-
-#### Fetch Vault Data
-
-* **Auth**: `Authorization: Bearer <token>`
-* **Response Model**: `vaultModel`
-
-  ```json
-  {
-    "vault": { "vault": "myvault", "date_created": "...", "size": 1000, "used_storage": 200 },
-    "files": [
-      {
-        "file": "report.pdf",
-        "visibility": "public",
-        "file_id": "...",
-        "size": 500,
-        "date_created": "..."
-      }
-    ]
-  }
-  ```
-
----
-
-### File Operations
-
-| Method | Path              | Access     | Description                   |
-| ------ | ----------------- | ---------- | ----------------------------- |
-| POST   | `/file/upload`    | Owner JWT  | Upload file (enforced quota)  |
-| GET    | `/file/{file_id}` | Bearer JWT | Download file (presigned URL) |
-| PUT    | `/file/{file_id}` | Owner JWT  | Rename or change visibility   |
-| DELETE | `/file/{file_id}` | Owner JWT  | Delete file & free storage    |
-
-#### Upload File
-
-* **Form Data**: field `file`: file to upload
-* **Permissions**: owner only
-* **Storage Check**: returns  message on quota exceed
-* **Success**: `200 OK` `{ "message": "File uploaded successfully" }`
-* **Errors**: `403 Forbidden`, `500 Internal Server Error`
-
-#### Download File
-
-* **URL**: `/file/{file_id}`
-* **Response**: `{ "download_url": "...", "valid_for_seconds": 600 }`
-* **Errors**: `404 Not Found`, `500 Internal Server Error`
-
-#### Rename / Update Visibility
-
-* **Request Body**:
-
-  ```json
-  { "new_name": "new.pdf", "visibility": "private" }
-  ```
-* **Success**: `200 OK` `{ "message": "File updated successfully" }`
-* **Errors**: `403 Forbidden`, `404 Not Found`
-
-#### Delete File
-
-* **URL**: `/file/{file_id}`
-* **Success**: `200 OK` `{ "message": "file deleted successfully" }`
-* **Errors**: `403 Forbidden`, `404 Not Found`
-
----
-
-## ⚙️ Setup & Development
-
-### Prerequisites
-
-* **Python** ≥ 3.8
-* **Docker & Docker Compose**
+1. FastAPI
+2. Pydantic
+3. SQLAlchemy
+4. S3-compatible storage (MinIO)
 
 
 
-1. **Clone the Repository:**
+## 📥 Getting Started
+
+The BinX API depends on MinIO (for S3-compatible storage) and PostgreSQL. A `docker-compose.yml` is provided to spin up these services:
+
+```yaml
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"  # S3 API endpoint
+      - "9001:9001"  # Web UI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server --console-address ":9001" /data
+
+  db:
+    image: postgres:15
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: binx
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  minio_data:
+  postgres_data:
+```
+
+This compose file will:
+
+* Launch **MinIO** on ports 9000 (S3 API) and 9001 (web console), using `minioadmin` credentials.
+* Launch **PostgreSQL** 15 on port 5432 with a `binx` database.
+
+1. **Clone the repository**
 
    ```bash
-   git clone https://your-repo-url.git
-   cd binx-api
+   git clone https://github.com/Itsmmdoha/BinX.git
+   cd BinX
    ```
-
-2. **Create a Virtual Environment:**
+2. **Set up the environment**
 
    ```bash
    python -m venv venv
-   source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-   ```
-
-3. **Install Dependencies:**
-
-   ```bash
+   source venv/bin/activate    # Windows: venv\Scripts\activate
    pip install -r requirements.txt
    ```
+3. **Start required services**
 
-### Running with Docker Compose
+   Make sure you have docker and docker-compose installed and run the following command
+    ```bash
+   docker-compose up -d
+   ```
 
-Before running the FastAPI server, you need to start MinIO and PostgreSQL with Docker Compose:
+   * MinIO available at [http://localhost:9000](http://localhost:9000)
+   * PostgreSQL at `localhost:5432`
+5. **Launch the API server**
 
-```bash
-docker-compose up
-```
+   ```bash
+   uvicorn app:app --reload
+   ```
+6. **Access API docs**
 
-This will launch:
-- **MinIO:** Accessible on [http://localhost:9000](http://localhost:9000)
-- **PostgreSQL:** Accessible on [http://localhost:5432](http://localhost:5432)
-
-### Starting the Server
-
-Once the dependencies and services are set up, start the FastAPI development server:
-
-```bash
-uvicorn app:app --reload
-```
-
-Access the API documentation via:
-- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Redoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+   * Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
 
-## 🌟 Future Plans
+## API Documentation
+
+Here's the [API Documentation](./API_Docs.md)
+
+## ⚙️ Future Plans
 
 * **Frontend**: Web UI for vault & file management.
 * **Granular RBAC**: Roles beyond owner/guest (e.g., admin).
 * **Audit Logging**: Track actions and access patterns.
 * **Shareable Links**: Secure public file links with tokens.
 
----
 
 ## 📄 License
 
-Released under the MIT License. See [LICENSE](./LICENSE).
+Released under the MIT License. See [LICENSE](./LICENSE) for details.
