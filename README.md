@@ -9,6 +9,7 @@ BinX is a secure convenience focused file storage service designed for simplicit
 
 With BinX, you can **create vaults**, **log in (as guest or owner)**, **upload files**, **download**, **delete**, **rename**, and **change file visibility**.
 
+> Status: Active Development
 
 ## 🛠️ Tech Stack
 
