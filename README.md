@@ -13,10 +13,11 @@ With BinX, you can **create vaults**, **log in (as guest or owner)**, **upload f
 
 ## 🛠️ Tech Stack
 
-1. FastAPI
-2. Pydantic
-3. SQLAlchemy
-4. S3-compatible storage (MinIO)
+1. FastAPI (API)
+2. Pydantic (Data Validation and Serializetion)
+3. PostgreSQL (Database)
+4. SQLAlchemy (ORM)
+5. S3-compatible storage (MinIO)
 
 
 
