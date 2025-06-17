@@ -1,7 +1,5 @@
 # BinX API
 
-[![GitHub Repo](https://github.com/Itsmmdoha/BinX)](https://github.com/Itsmmdoha/BinX)
-
 BinX is a secure convenience focused file storage service designed for simplicity and speed. Create password-protected vaults to organize and safeguard your files. Access your vaults in two modes:
 
 * **Owner**: Authenticate with both vault name and password to view, upload, delete, rename, and change visibility of all files (both `private` & `public`).
