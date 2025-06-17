@@ -141,6 +141,7 @@ def fetch_file_list_from_vault(
     responses={
         401: {"model": ErrorModel},
         403: {"model": ErrorModel},
+        507: {"model": ErrorModel},
         500: {"model": ErrorModel}
     }
 )
@@ -162,8 +163,7 @@ async def upload_file(
     vault_size = vault.size
     used_storage = vault.used_storage
     if (used_storage + file_size) > vault_size:
-        return {"message": "not enough storage, please delete some files and try again"}
-
+        raise HTTPException(status_code=507, detail="Insufficient Storage")
     try:
         # store file metadata
         new_file = File(vault= vault_name, file = file_name, size=file_size)
