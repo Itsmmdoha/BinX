@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File as FastAPIFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.concurrency import run_in_threadpool
 from typing import Callable
@@ -6,6 +7,7 @@ from enum import Enum
 
 from database import Vault, File, get_session
 from s3 import s3_client, create_bucket_if_not_exists, BUCKET_NAME
+from config import FRONTEND_HOST
 from sqlalchemy import select, and_
 from auth import Password, Token
 from models.request import VaultCreateCredentials, VaultLoginCredentials, FileUpdateModel
@@ -25,6 +27,14 @@ def require_role(required_role: Role) -> Callable:
 
 
 app = FastAPI(title="BinX",version="0.0.1", redoc_url=None)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[FRONTEND_HOST],# Allowed origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 bearer_scheme = HTTPBearer()
 

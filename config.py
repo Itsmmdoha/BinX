@@ -1,3 +1,4 @@
+FRONTEND_HOST="http://localhost:3000"
 # postgresql
 DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/binx"
 
