@@ -8,10 +8,10 @@ from enum import Enum
 from database import Vault, File, get_session
 from s3 import s3_client, create_bucket_if_not_exists, BUCKET_NAME
 from config import FRONTEND_HOST
-from sqlalchemy import select, and_
+from sqlalchemy import select, delete, and_
 from auth import Password, Token
-from models.request import VaultCreateCredentials, VaultLoginCredentials, FileUpdateModel
-from models.response import SuccessModel, ErrorModel, LoginSuccessModel, DownloadModel, VaultModel
+from models.request import VaultCreateCredentials, VaultLoginCredentials, FileUpdateModel, BulkDeleteRequest
+from models.response import SuccessModel, ErrorModel, LoginSuccessModel, DownloadModel, VaultModel, BulkDeleteResponse 
 from uuid import UUID
 
 class Role(str, Enum):
@@ -291,4 +291,50 @@ async def delete_file(
         return {"message":"file deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="File not found")
+
+@app.post("/file/bulk-delete",
+    tags=["File Operations"],
+    response_model=BulkDeleteResponse,
+    responses={
+        401: {"model": ErrorModel},
+        403: {"model": ErrorModel},
+        404: {"model": ErrorModel},
+        500: {"model": ErrorModel},
+    }
+)
+async def bulk_delete(
+        file_ids: BulkDeleteRequest, 
+        token_payload: dict = Depends(get_token_payload),
+        _: None = Depends(require_role(Role.OWNER)),
+        db_session = Depends(get_session)
+):
+    vault_name = token_payload.get("vault")
+    stmt = select(File).where(File.file_id.in_(file_ids.file_ids))
+    files_to_delete = db_session.scalars(stmt).all()
+    if len(files_to_delete) == 0:
+        raise HTTPException(status_code=404, detail="No files found")
+    file_ids_to_delete = []
+    freed_space = 0
+    for file in files_to_delete:
+        file_ids_to_delete.append(file.file_id)
+        freed_space += file.size
+    files_not_found = list(set(file_ids.file_ids) - set(file_ids_to_delete))
+
+    try:
+        # delete from database 
+        delete_stmt = delete(File).where(File.file_id.in_(file_ids_to_delete))
+        db_session.execute(delete_stmt)
+        
+        # Delete from s3 
+        delete_keys = {"Objects": [{"Key": key} for key in file_ids_to_delete]}
+        s3_client.delete_objects(Bucket = BUCKET_NAME, Delete=delete_keys)
+
+        # update_used_storage
+        vault_stmt = select(Vault).where(Vault.vault==vault_name)
+        vault = db_session.scalars(vault_stmt).first()
+        vault.used_storage = vault.used_storage - freed_space
+        db_session.commit()
+        return {"deleted_files":{"count":len(file_ids_to_delete), "file_ids":file_ids_to_delete}, "files_not_found": {"count": len(files_not_found), "file_ids": files_not_found}}
+    except:
+        raise HTTPException(status_code=500, detail="Bulk Deletion Failed")
 

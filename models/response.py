@@ -2,6 +2,8 @@ from pydantic import BaseModel
 from typing import List
 from uuid import UUID
 from datetime import datetime
+
+from database.db import Base
 from .shared import Visibility
 
 class VaultInfoModel(BaseModel):
@@ -41,3 +43,10 @@ class LoginSuccessModel(BaseModel):
 class DownloadModel(BaseModel):
     download_url: str
     valid_for_seconds: int
+
+class Files(BaseModel):
+    count: int
+    file_ids: List[UUID]
+class BulkDeleteResponse(BaseModel):
+    deleted_files: Files 
+    files_not_found: Files
