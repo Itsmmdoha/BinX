@@ -1,3 +1,4 @@
+from logging import exception
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File as FastAPIFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -326,7 +327,7 @@ async def bulk_delete(
         db_session.execute(delete_stmt)
         
         # Delete from s3 
-        delete_keys = {"Objects": [{"Key": key} for key in file_ids_to_delete]}
+        delete_keys = {"Objects": [{"Key": str(file_id)} for file_id in file_ids_to_delete]}
         s3_client.delete_objects(Bucket = BUCKET_NAME, Delete=delete_keys)
 
         # update_used_storage
@@ -335,6 +336,6 @@ async def bulk_delete(
         vault.used_storage = vault.used_storage - freed_space
         db_session.commit()
         return {"deleted_files":{"count":len(file_ids_to_delete), "file_ids":file_ids_to_delete}, "files_not_found": {"count": len(files_not_found), "file_ids": files_not_found}}
-    except:
-        raise HTTPException(status_code=500, detail="Bulk Deletion Failed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bulk Deletion Failed, error:{e}")
 
