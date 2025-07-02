@@ -1,7 +1,7 @@
-from datetime import datetime, timezone 
-from sqlalchemy import DateTime
+from datetime import  datetime, timezone 
+from sqlalchemy import BigInteger, DateTime
 from sqlalchemy import String
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, MappedColumn
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 
@@ -14,6 +14,8 @@ import uuid6
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from config import DATABASE_URL
 
+MB = 1024 * 1024
+GB = MB * 1024
 
 class Base(DeclarativeBase):
     pass
@@ -24,7 +26,7 @@ class Vault(Base):
     vault: Mapped[str] = mapped_column(unique=True)
     date_created: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     password_hash: Mapped[str] = mapped_column(String(60))
-    size: Mapped[int] = mapped_column(default=500 * 1024 * 1024) # Size in bytes, default is 500 MB
+    size: Mapped[int] = mapped_column(BigInteger, default=500*MB) # Size in bytes, default is 500 MB
     used_storage: Mapped[int] = mapped_column(default=0)
 
     def __repr__(self) -> str:
@@ -42,7 +44,7 @@ class File(Base):
     visibility: Mapped[str] = mapped_column(default="private")
     vault: Mapped[str] 
     file: Mapped[str] 
-    size: Mapped[int] # Size in bytes
+    size: Mapped[int] = MappedColumn(BigInteger)# Size in bytes
     date_created: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
