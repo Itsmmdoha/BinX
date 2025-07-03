@@ -13,16 +13,16 @@ DATABASE_URL = os.environ.get(
 
 # S3/MinIO (development) configuration
 # Environment variable: S3_ENDPOINT
-ENDPOINT = os.environ.get("S3_ENDPOINT", "http://localhost:9000")
+S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT", "http://localhost:9000")
 
 # Environment variable: S3_ACCESS_KEY
-ACCESS_KEY = os.environ.get("S3_ACCESS_KEY", "minioadmin")
+S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY", "minioadmin")
 
 # Environment variable: S3_SECRET_KEY
-SECRET_KEY = os.environ.get("S3_SECRET_KEY", "minioadmin")
+S3_SECRET_KEY = os.environ.get("S3_SECRET_KEY", "minioadmin")
 
 # Environment variable: S3_BUCKET_NAME
-BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "binx")
+S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "binx")
 
 # JWT Secret Key configuration
 # Environment variable: JWT_SECRET_KEY

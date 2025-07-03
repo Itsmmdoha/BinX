@@ -6,7 +6,7 @@ from typing import Callable
 from enum import Enum
 
 from database import Vault, File, get_session
-from s3 import s3_client, bucket_exists, BUCKET_NAME
+from s3 import s3_client, bucket_exists, S3_BUCKET_NAME
 from config import FRONTEND_HOST
 from sqlalchemy import select, delete, and_
 from auth import Password, Token
@@ -180,7 +180,7 @@ async def upload_file(
         await run_in_threadpool( 
             s3_client.upload_fileobj,   
             file.file,
-            BUCKET_NAME,
+            S3_BUCKET_NAME,
             file_key
         )
     except Exception as e:
@@ -218,7 +218,7 @@ async def download_file(
     try:
         presigned_url = s3_client.generate_presigned_url(
             ClientMethod='get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': str(file_id), 'ResponseContentDisposition': f'attachment; filename="{file.file}"'},
+            Params={'Bucket': S3_BUCKET_NAME, 'Key': str(file_id), 'ResponseContentDisposition': f'attachment; filename="{file.file}"'},
             ExpiresIn= valid_for,
         )
     except Exception:
@@ -291,7 +291,7 @@ async def delete_file(
         vault = db_session.scalars(find_vault_stmt).first()
         vault.used_storage-=file.size
         db_session.commit()
-        s3_client.delete_object(Bucket=BUCKET_NAME, Key=str(file_id))
+        s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=str(file_id))
         return {"message":"file deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="File not found")
@@ -331,7 +331,7 @@ async def bulk_delete(
         
         # Delete from s3 
         delete_keys = {"Objects": [{"Key": str(file_id)} for file_id in file_ids_to_delete]}
-        s3_client.delete_objects(Bucket = BUCKET_NAME, Delete=delete_keys)
+        s3_client.delete_objects(Bucket = S3_BUCKET_NAME, Delete=delete_keys)
 
         # update_used_storage
         vault_stmt = select(Vault).where(Vault.vault==vault_name)
