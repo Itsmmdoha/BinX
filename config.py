@@ -1,13 +1,29 @@
-FRONTEND_HOST="http://localhost:3000"
-# postgresql
-DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/binx"
+import os
 
-# S3
-ENDPOINT = "b456c973fcfed7f5383ebbef9b82b425.r2.cloudflarestorage.com"
-ACCESS_KEY = "f962a8292930c0620a7a8166fe62f6cf"
-SECRET_KEY = "cd2c90643a4f69992e4172eab295a707ea2e4d9c9b30a8283f32dea28faa4dbe"
-BUCKET_NAME = "binx"
+# Frontend configuration
+# Environment variable: FRONTEND_HOST
+FRONTEND_HOST = os.environ.get("FRONTEND_HOST", "http://localhost:3000")
 
-# jwt-secret-key
-JWT_SECRET_KEY = "your-secret-key" 
+# PostgreSQL database configuration
+# Environment variable: DATABASE_URL
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+psycopg://user:password@localhost:5432/binx"
+)
 
+# S3/MinIO (development) configuration
+# Environment variable: S3_ENDPOINT
+ENDPOINT = os.environ.get("S3_ENDPOINT", "http://localhost:9000")
+
+# Environment variable: S3_ACCESS_KEY
+ACCESS_KEY = os.environ.get("S3_ACCESS_KEY", "minioadmin")
+
+# Environment variable: S3_SECRET_KEY
+SECRET_KEY = os.environ.get("S3_SECRET_KEY", "minioadmin")
+
+# Environment variable: S3_BUCKET_NAME
+BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "binx")
+
+# JWT Secret Key configuration
+# Environment variable: JWT_SECRET_KEY
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your-secret-key")

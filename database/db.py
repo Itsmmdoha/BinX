@@ -61,22 +61,3 @@ def get_session():
         yield session  # session automatically closes when done
 
 
-if __name__ == "__main__":
-    session = next(get_session()) # this is done automatically Depends(get_session) in FastAPI
-
-    new_vault = Vault(vault="testName1", size=500, password_hash="hash_string_of_password")
-    session.add(new_vault)
-    try:
-        session.commit()
-    except:
-        pass
-        # Here, log the error
-        #if an exception is raised while commiting the data, like constraints(e.g. not unique), or IO failure, the commit is rolled back
-        # session.rollback() - manual rollback is not necessary, the context manager __exit__() method handles it all 
-        #then the connection is closed by the context manager(with) 
-
-    stmt = select(Vault)
-    vaults = session.scalar(stmt)
-    print(vaults)
-
-
