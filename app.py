@@ -1,7 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File as FastAPIFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import object_session
 from starlette.concurrency import run_in_threadpool
+from starlette.responses import RedirectResponse
 from typing import Callable
 from enum import Enum
 
@@ -342,3 +344,46 @@ async def bulk_delete(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Bulk Deletion Failed, error:{e}")
 
+@app.get(
+    "/{vault_name}/file/{file_id}",
+    tags=["File Operations"],
+    response_class=RedirectResponse,
+    status_code=307,  # temporary redirect
+    responses={
+        403: {"model": ErrorModel},
+        404: {"model": ErrorModel},
+        500: {"model": ErrorModel},
+    }
+)
+async def get_file_from_url(
+    vault_name: str,
+    file_id: UUID,
+    db_session = Depends(get_session),
+):
+    stmt = select(File).where(
+        and_(
+            File.vault == vault_name,
+            File.file_id == file_id
+        )
+    )
+    file = db_session.scalars(stmt).first()
+    if file is None:
+        raise HTTPException(404, "File not found")
+    if file.visibility == "private":
+        raise HTTPException(403, "This file is private")
+
+    try:
+        presigned_url = s3_client.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={
+                "Bucket": S3_BUCKET_NAME,
+                "Key": str(file_id),
+                "ResponseContentDisposition": f'attachment; filename="{file.file}"'
+            },
+            ExpiresIn=60 * 10,  # 10 minutes
+        )
+    except Exception as e:
+        print(e)
+        raise HTTPException(500, "Error generating download link")
+
+    return RedirectResponse(url=presigned_url, status_code=307)
