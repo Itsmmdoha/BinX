@@ -6,7 +6,7 @@ from typing import Callable
 from enum import Enum
 
 from database import Vault, File, get_session
-from s3 import s3_client, create_bucket_if_not_exists, BUCKET_NAME
+from s3 import s3_client, bucket_exists, BUCKET_NAME
 from config import FRONTEND_HOST
 from sqlalchemy import select, delete, and_
 from auth import Password, Token
@@ -46,7 +46,11 @@ def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(bearer
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or Expired Token")
 
-create_bucket_if_not_exists()
+if bucket_exists():
+    pass
+else:
+    print("Bucket doesn't exist")
+    exit()
 
 @app.post("/vault/create",
     tags=["Vault Operations"],
