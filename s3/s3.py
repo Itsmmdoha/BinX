@@ -1,10 +1,10 @@
 import boto3 
-from config import ENDPOINT, ACCESS_KEY, SECRET_KEY, BUCKET_NAME
+from config import ENDPOINT_URL, ACCESS_KEY, SECRET_KEY, BUCKET_NAME
 from botocore.exceptions import ClientError
 
 s3_client = boto3.client(
     "s3",
-    endpoint_url=f"https://{ENDPOINT}",  # R2 requires HTTPS
+    endpoint_url=ENDPOINT_URL,  # R2 requires HTTPS
     aws_access_key_id=ACCESS_KEY,
     aws_secret_access_key=SECRET_KEY,
     region_name="auto"  # required for R2
