@@ -233,6 +233,69 @@ fetch(`/file/${fileId}`, {
 
 ---
 
+## Bulk Delete Files
+
+**Endpoint:** `POST /file/bulk-delete`
+
+Delete multiple files at once by providing a list of their `file_id`s.
+
+### Request
+
+```json
+{
+  "file_ids": [
+    "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "b1a25f64-1234-4562-b3fc-2c963f66xyz1"
+  ]
+}
+```
+
+### JS Fetch Example
+
+```js
+fetch("/file/bulk-delete", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    file_ids: [
+      "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "b1a25f64-1234-4562-b3fc-2c963f66xyz1"
+    ]
+  })
+})
+```
+
+### Response
+
+```json
+{
+  "deleted_files": {
+    "count": 1,
+    "file_ids": [
+      "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    ]
+  },
+  "files_not_found": {
+    "count": 1,
+    "file_ids": [
+      "b1a25f64-1234-4562-b3fc-2c963f66xyz1"
+    ]
+  }
+}
+```
+
+### Notes
+
+* Files not found in the vault will be reported under the `files_not_found` field.
+* Files that are successfully deleted will be listed under `deleted_files`.
+
+
+
+---
+
 ## Update a File (Rename or Change Visibility)
 
 **Endpoint:** `PUT /file/{file_id}`
