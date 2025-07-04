@@ -9,6 +9,8 @@ With BinX, you can **create vaults**, **log in (as guest or owner)**, **upload f
 
 > Status: Active Development
 
+Find the NextJS frontend repository [here](https://github.com/itsmmdoha/binx-frontend)
+
 ## 🛠️ Tech Stack
 
 1. FastAPI (API)  
