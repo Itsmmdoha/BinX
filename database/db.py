@@ -1,13 +1,12 @@
 from datetime import  datetime, timezone 
 from sqlalchemy import BigInteger, DateTime
 from sqlalchemy import String
-from sqlalchemy.orm import DeclarativeBase, MappedColumn
+from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 
 import uuid
 import uuid6
@@ -30,7 +29,7 @@ class Vault(Base):
     used_storage: Mapped[int] = mapped_column(default=0)
 
     def __repr__(self) -> str:
-        return f"Vault(id={self.id!r}, vault={self.vault!r}, size={self.size}, password_hash={self.password_hash!r})"
+        return f"Vault(id={self.id!r}, vault={self.vault!r}, date_created={self.date_created!r},size={self.size!r}, password_hash={self.password_hash!r})"
 
 class File(Base):
     __tablename__ = "files"
@@ -43,12 +42,12 @@ class File(Base):
     visibility: Mapped[str] = mapped_column(default="private")
     vault: Mapped[str] 
     file: Mapped[str] 
-    size: Mapped[int] = MappedColumn(BigInteger)# Size in bytes
+    size: Mapped[int] = mapped_column(BigInteger)# Size in bytes
     date_created: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
     def __repr__(self) -> str:
-        return f"file(id={self.id!r}, vault={self.vault!r},  file={self.file!r}, size={self.size!r}, date_created={self.date_created!r})"
+        return f"file(id={self.file_id!r}, visibility={self.visibility!r},vault={self.vault!r},  file={self.file!r}, size={self.size!r}, date_created={self.date_created!r})"
 
 
 engine = create_engine(DATABASE_URL, echo=True)
