@@ -1,5 +1,5 @@
 from datetime import  datetime, timezone 
-from sqlalchemy import BigInteger, DateTime
+from sqlalchemy import BigInteger, DateTime, ForeignKey
 from sqlalchemy import String
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
@@ -40,7 +40,7 @@ class File(Base):
         unique=True
     )
     visibility: Mapped[str] = mapped_column(default="private")
-    vault: Mapped[str] 
+    vault: Mapped[str] = mapped_column(ForeignKey("vaults.vault"))
     file: Mapped[str] 
     size: Mapped[int] = mapped_column(BigInteger)# Size in bytes
     date_created: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
