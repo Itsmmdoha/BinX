@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/Itsmmdoha/BinX">
-    <img src="https://binx.houndsec.net/logo.svg" alt="BinX Logo" width="150" height="150">
+    <img src="https://raw.githubusercontent.com/Itsmmdoha/binx-frontend/refs/heads/main/public/logo.svg" alt="BinX Logo" width="150" height="150">
   </a>
 
   # _Store it_, with [BinX](https://binx.houndsec.net)
@@ -16,7 +16,6 @@
   </p>
 </div>
 <br>
-
 
 # BinX API
 
