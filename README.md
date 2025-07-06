@@ -1,3 +1,23 @@
+<div align="center">
+  <a href="https://github.com/Itsmmdoha/BinX">
+    <img src="https://binx.houndsec.net/logo.svg" alt="BinX Logo" width="150" height="150">
+  </a>
+
+  # _Store it_, with [BinX](https://binx.houndsec.net)
+
+  <p>
+    Secure, password‑protected vaults <a href="https://binx.houndsec.net"><strong>in your web browser</strong></a>.  
+    <br>
+    FastAPI + PostgreSQL + S3  
+    <br><br>
+    <a href="https://github.com/Itsmmdoha/BinX/issues">Report a bug</a>
+    &nbsp;|&nbsp;
+    <a href="https://github.com/Itsmmdoha/BinX/issues">Request feature</a>
+  </p>
+</div>
+<br>
+
+
 # BinX API
 
 BinX is a secure convenience‑focused file storage service designed for simplicity and speed. Create password‑protected vaults to organize and safeguard your files. Access your vaults in two modes:
@@ -17,7 +37,7 @@ Find the NextJS frontend repository [here](https://github.com/itsmmdoha/binx-fro
 2. Pydantic (Data Validation and Serialization)  
 3. PostgreSQL (Database)  
 4. SQLAlchemy (ORM)  
-5. S3‑compatible storage (MinIO)
+5. S3‑compatible storage
 
 ## 📥 Getting Started
 
