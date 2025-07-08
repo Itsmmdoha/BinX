@@ -126,12 +126,10 @@ This compose file will:
 
 Here's the [API Documentation](./API_Docs.md)
 
-## ⚙️ Future Plans
+## ⚙️ TODO
 
-* **Frontend**: Web UI for vault & file management.
-* **Granular RBAC**: Roles beyond owner/guest (e.g., admin).
 * **Audit Logging**: Track actions and access patterns.
-* **Shareable Links**: Secure public file links with tokens.
+
 
 ## 🚀 Deployment
 
