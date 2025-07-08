@@ -129,7 +129,7 @@ Here's the [API Documentation](./API_Docs.md)
 ## ⚙️ TODO
 
 * **Audit Logging**: Track actions and access patterns.
-
+* **Multi-part Upload**: Optimize uploads with multi-part uploads
 
 ## 🚀 Deployment
 
