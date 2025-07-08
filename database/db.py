@@ -29,11 +29,11 @@ class Vault(Base):
     used_storage: Mapped[int] = mapped_column(default=0)
 
     def __repr__(self) -> str:
-        return f"Vault(id={self.id!r}, vault={self.vault!r}, date_created={self.date_created!r},size={self.size!r}, password_hash={self.password_hash!r})"
+        return f"Vault(id={self.id!r}, vault={self.vault!r}, date_created={self.date_created!r},size={self.size!r}, used_storage={self.used_storage!r}, password_hash={self.password_hash!r})"
 
 class File(Base):
     __tablename__ = "files"
-    file_id: Mapped[uuid.UUID] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), 
         primary_key=True, 
         default=uuid6.uuid7,
@@ -50,7 +50,7 @@ class File(Base):
 
 
     def __repr__(self) -> str:
-        return f"file(id={self.file_id!r}, visibility={self.visibility!r},vault={self.vault!r},  file={self.file!r}, size={self.size!r}, date_created={self.date_created!r})"
+        return f"file(id={self.id!r}, visibility={self.visibility!r},vault={self.vault_id!r},  file={self.file!r}, size={self.size!r}, date_created={self.date_created!r})"
 
 
 engine = create_engine(DATABASE_URL, echo=True)

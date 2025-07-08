@@ -122,7 +122,8 @@ def login_to_vault(
     response_model=VaultModel,
     responses={
         401: {"model": ErrorModel},
-        403: {"model": ErrorModel}
+        403: {"model": ErrorModel},
+        404: {"model": ErrorModel}
     }
 )
 def fetch_file_list_from_vault(
@@ -132,6 +133,8 @@ def fetch_file_list_from_vault(
     vault_id= token_payload.get("vault_id")
     role = token_payload.get("role")
     vault = db_session.scalars(select(Vault).where(Vault.id==vault_id)).first()
+    if vault is None:
+        raise HTTPException(status_code=404, detail="Vault Not Found")
     files_stmt = select(File)
     if role == Role.GUEST:
         files_stmt = files_stmt.where(and_(File.vault_id== vault_id, File.visibility == "public"))
@@ -139,6 +142,39 @@ def fetch_file_list_from_vault(
         files_stmt = files_stmt.where(File.vault_id == vault_id) # All Files, without any filter
     files = db_session.scalars(files_stmt).all()
     return {"vault": vault, "files": files}
+
+@app.delete("/vault",
+    tags=["Vault Operations"],
+    response_model=SuccessModel,
+    responses={
+        401: {"model": ErrorModel},
+        403: {"model": ErrorModel}
+    }
+)
+def delete_vault(
+        token_payload: dict = Depends(get_token_payload),
+        db_session = Depends(get_session)
+):
+    vault_id= token_payload.get("vault_id")
+    role = token_payload.get("role")
+    if role != Role.OWNER:
+        raise HTTPException(status_code=401, detail="Not Authorized")
+    try:
+        stmt = select(File.id).where(File.vault_id == vault_id)
+        # fetch ids of stored files
+        file_ids_to_delete = db_session.scalars(stmt).all()
+        # delete from database
+        stmt = delete(Vault).where(Vault.id == vault_id)
+        db_session.execute(stmt)
+        # delete from s3
+        delete_keys = {"Objects": [{"Key": str(file_id)} for file_id in file_ids_to_delete]}
+        s3_client.delete_objects(Bucket = S3_BUCKET_NAME, Delete=delete_keys)
+        # commit deletes in database
+        db_session.commit()
+        return {"message": "Vault Deleted successfully"}
+    except:
+        raise HTTPException(status_code=401, detail="Not Authorized")
+
 
 
 
@@ -179,7 +215,7 @@ async def upload_file(
         db_session.commit()
 
         # Run the upload_fileobj via the threadpool and await it
-        file_key = str(new_file.file_id)
+        file_key = str(new_file.id)
         await run_in_threadpool( 
             s3_client.upload_fileobj,   
             file.file,
@@ -209,7 +245,7 @@ async def download_file(
 ):
     vault_id = token_payload.get("vault_id")
     role = token_payload.get("role")
-    stmt = select(File).where(and_(File.vault_id == vault_id, File.file_id==file_id))
+    stmt = select(File).where(and_(File.vault_id == vault_id, File.id==file_id))
     if role == Role.GUEST:
         stmt = stmt.where(File.visibility == "public") # if role is guest, only allow public files
     file = db_session.scalars(stmt).first()
@@ -255,7 +291,7 @@ async def update_file(
         db_session = Depends(get_session)
 ):
     vault_id = token_payload.get("vault_id")
-    stmt = select(File).where(and_(File.vault_id == vault_id, File.file_id == file_id))
+    stmt = select(File).where(and_(File.vault_id == vault_id, File.id == file_id))
     file = db_session.scalars(stmt).first()
     if file:
         if update_data.new_name is not None:
@@ -284,7 +320,7 @@ async def delete_file(
         db_session = Depends(get_session)
 ):
     vault_id = token_payload.get("vault_id")
-    stmt = select(File).where(and_(File.vault_id == vault_id, File.file_id== file_id))
+    stmt = select(File).where(and_(File.vault_id == vault_id, File.id== file_id))
     file = db_session.scalars(stmt).first()
     if file:
         db_session.delete(file)
@@ -314,7 +350,7 @@ async def bulk_delete(
         db_session = Depends(get_session)
 ):
     vault_id = token_payload.get("vault_id")
-    stmt = select(File).where(File.file_id.in_(file_ids.file_ids))
+    stmt = select(File).where(File.id.in_(file_ids.file_ids))
     files_to_delete = db_session.scalars(stmt).all()
     if len(files_to_delete) == 0:
         raise HTTPException(status_code=404, detail="No files found")
@@ -327,7 +363,7 @@ async def bulk_delete(
 
     try:
         # delete from database 
-        delete_stmt = delete(File).where(File.file_id.in_(file_ids_to_delete))
+        delete_stmt = delete(File).where(File.id.in_(file_ids_to_delete))
         db_session.execute(delete_stmt)
         
         # Delete from s3 
@@ -364,7 +400,7 @@ async def get_file_from_url(
     stmt = select(File).where(
         and_(
             File.vault_id == vault_id,
-            File.file_id == file_id
+            File.id == file_id
         )
     )
     file = db_session.scalars(stmt).first()
