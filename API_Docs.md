@@ -12,15 +12,18 @@ Authorization: Bearer <your_jwt_token>
 
 1. [Vault Operations](#vault-operations)
 
-   - [Create a Vault](#create-a-vault)
-   - [Login to Vault](#login-to-vault)
-   - [Fetch File List from Vault](#fetch-file-list-from-vault)
+   * [Create a Vault](#create-a-vault)
+   * [Login to Vault](#login-to-vault)
+   * [Fetch File List from Vault](#fetch-file-list-from-vault)
+   * [Update a Vault](#update-a-vault)
+   * [Delete a Vault](#delete-a-vault)
 2. [File Operations](#file-operations)
 
-   - [Upload a File](#upload-a-file)
-   - [Download a File](#download-a-file)
-   - [Delete a File](#delete-a-file)
-   - [Update a File (Rename or Change Visibility)](#update-a-file-rename-or-change-visibility)
+   * [Upload a File](#upload-a-file)
+   * [Download a File](#download-a-file)
+   * [Delete a File](#delete-a-file)
+   * [Bulk Delete Files](#bulk-delete-files)
+   * [Update a File (Rename or Change Visibility)](#update-a-file-rename-or-change-visibility)
 
 ---
 
@@ -104,7 +107,7 @@ fetch("/vault/login", {
 }
 ```
 
-The subsequent requests require you to send this token in the Authorization header like the following:
+Subsequent requests require this token in the Authorization header:
 
 ```
 Authorization: Bearer <your_jwt_token>
@@ -148,7 +151,83 @@ fetch("/vault/fetch", {
 }
 ```
 
-Each file has a `file_id`; this id is used to perform file operations on files.
+---
+
+## Update a Vault
+
+**Endpoint:** `PUT /vault`
+
+Update vault properties: **rename** and/or **change password**. Both `new_name` and `new_password` are optional fields; at least one must be provided.
+
+* To **rename** the vault, include the `new_name` field in the request body.
+* To **change the password**, include the `new_password` field in the request body.
+* To perform **both actions**, include both attributes in the same request.
+
+### Request Body
+
+```json
+{
+  "new_name": "renamedVault",
+  "new_password": "newStrongPassword"
+}
+```
+
+### JS Fetch Example
+
+```js
+fetch("/vault", {
+  method: "PUT",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`
+  },
+  body: JSON.stringify({ new_name: "renamedVault", new_password: "newStrongPassword" })
+})
+```
+
+### Response (200)
+
+```json
+{
+  "message": "Vault Information Updated successfully"
+}
+```
+
+### Error Responses
+
+* **401 Unauthorized** – Not authorized (must be vault owner).
+* **403 Forbidden** – Action forbidden.
+* **404 Not Found** – Vault not found.
+
+---
+
+## Delete a Vault
+
+**Endpoint:** `DELETE /vault`
+
+Deletes the vault and all its files. Only the vault owner may perform this action.
+
+### JS Fetch Example
+
+```js
+fetch("/vault", {
+  method: "DELETE",
+  headers: { Authorization: `Bearer ${token}` }
+})
+```
+
+### Response (200)
+
+```json
+{
+  "message": "Vault Deleted successfully"
+}
+```
+
+### Error Responses
+
+* **401 Unauthorized** – Not authorized (must be vault owner).
+* **403 Forbidden** – Action forbidden.
 
 ---
 
@@ -259,8 +338,7 @@ fetch("/file/bulk-delete", {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`
   },
-  body: JSON.stringify({
-    file_ids: [
+  body: JSON.stringify({ file_ids: [
       "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "b1a25f64-1234-4562-b3fc-2c963f66xyz1"
     ]
@@ -286,13 +364,6 @@ fetch("/file/bulk-delete", {
   }
 }
 ```
-
-### Notes
-
-* Files not found in the vault will be reported under the `files_not_found` field.
-* Files that are successfully deleted will be listed under `deleted_files`.
-
-
 
 ---
 
