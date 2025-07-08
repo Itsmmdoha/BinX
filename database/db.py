@@ -40,7 +40,10 @@ class File(Base):
         unique=True
     )
     visibility: Mapped[str] = mapped_column(default="private")
-    vault: Mapped[str] = mapped_column(ForeignKey("vaults.vault"))
+    vault_id: Mapped[int] = mapped_column(
+        ForeignKey("vaults.id", ondelete="CASCADE"), 
+        nullable=False
+    )
     file: Mapped[str] 
     size: Mapped[int] = mapped_column(BigInteger)# Size in bytes
     date_created: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

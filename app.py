@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File as FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import object_session
+from sqlalchemy.util import decode_backslashreplace
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse
 from typing import Callable
@@ -106,11 +107,11 @@ def login_to_vault(
     if vault is None:
         raise HTTPException(status_code=404, detail="Vault Not Found")
     elif vault_credentials.password is None:
-        payload = {"vault": vault.vault, "role":"guest"}
+        payload = {"vault": vault.vault, "vault_id": vault.id, "role":"guest"}
         token = Token.generate(payload, valid_for=12*3600)
         return {"message": "Login as guest successful", "access_token": token, "token_type": "bearer"}
     elif Password.is_valid(password=vault_credentials.password, hash_string=vault.password_hash):
-        payload = {"vault": vault.vault, "role":"owner"}
+        payload = {"vault": vault.vault, "vault_id": vault.id, "role":"owner"}
         token = Token.generate(payload, valid_for=12*3600)
         return {"message": "Login successful", "access_token": token, "token_type": "bearer"}
     else:
@@ -128,14 +129,14 @@ def fetch_file_list_from_vault(
         token_payload: dict = Depends(get_token_payload),
         db_session = Depends(get_session)
 ):
-    vault_name = token_payload.get("vault")
+    vault_id= token_payload.get("vault_id")
     role = token_payload.get("role")
-    vault = db_session.scalars(select(Vault).where(Vault.vault==vault_name)).first()
+    vault = db_session.scalars(select(Vault).where(Vault.id==vault_id)).first()
     files_stmt = select(File)
     if role == Role.GUEST:
-        files_stmt = files_stmt.where(and_(File.vault == vault_name, File.visibility == "public"))
+        files_stmt = files_stmt.where(and_(File.vault_id== vault_id, File.visibility == "public"))
     elif role == Role.OWNER:
-        files_stmt = files_stmt.where(File.vault == vault_name) # All Files, without any filter
+        files_stmt = files_stmt.where(File.vault_id == vault_id) # All Files, without any filter
     files = db_session.scalars(files_stmt).all()
     return {"vault": vault, "files": files}
 
@@ -157,14 +158,14 @@ async def upload_file(
         db_session=Depends(get_session),
         file: UploadFile = FastAPIFile(...)
 ):
-    vault_name = token_payload.get("vault")
+    vault_id = token_payload.get("vault_id")
     file_name = file.filename
     # Get file size without loading file into memory
     file.file.seek(0, 2)  
     file_size = file.file.tell()
     file.file.seek(0)  
 
-    stmt = select(Vault).where(Vault.vault==vault_name)
+    stmt = select(Vault).where(Vault.id==vault_id)
     vault = db_session.scalars(stmt).first()
     vault_size = vault.size
     used_storage = vault.used_storage
@@ -172,7 +173,7 @@ async def upload_file(
         raise HTTPException(status_code=507, detail="Insufficient Storage")
     try:
         # store file metadata
-        new_file = File(vault= vault_name, file = file_name, size=file_size)
+        new_file = File(vault_id = vault_id, file = file_name, size=file_size)
         db_session.add(new_file)
         vault.used_storage += file_size
         db_session.commit()
@@ -186,7 +187,6 @@ async def upload_file(
             file_key
         )
     except Exception as e:
-        print(e)
         db_session.rollback()
         raise HTTPException(status_code=500, detail="File Upload Failed")
 
@@ -207,9 +207,9 @@ async def download_file(
         token_payload: dict = Depends(get_token_payload),
         db_session = Depends(get_session)
 ):
-    vault_name = token_payload.get("vault")
+    vault_id = token_payload.get("vault_id")
     role = token_payload.get("role")
-    stmt = select(File).where(and_(File.vault == vault_name, File.file_id==file_id))
+    stmt = select(File).where(and_(File.vault_id == vault_id, File.file_id==file_id))
     if role == Role.GUEST:
         stmt = stmt.where(File.visibility == "public") # if role is guest, only allow public files
     file = db_session.scalars(stmt).first()
@@ -226,7 +226,6 @@ async def download_file(
     except Exception:
         raise HTTPException(status_code=500, detail="Error Generating Download Link}")
 
-    print(presigned_url)
     return {"download_url": presigned_url, "valid_for_seconds":valid_for}
 
 @app.put("/file/{file_id}",
@@ -255,8 +254,8 @@ async def update_file(
         _: None = Depends(require_role(Role.OWNER)),
         db_session = Depends(get_session)
 ):
-    vault_name = token_payload.get("vault")
-    stmt = select(File).where(and_(File.vault == vault_name, File.file_id == file_id))
+    vault_id = token_payload.get("vault_id")
+    stmt = select(File).where(and_(File.vault_id == vault_id, File.file_id == file_id))
     file = db_session.scalars(stmt).first()
     if file:
         if update_data.new_name is not None:
@@ -284,16 +283,16 @@ async def delete_file(
         _: None = Depends(require_role(Role.OWNER)),
         db_session = Depends(get_session)
 ):
-    vault_name = token_payload.get("vault")
-    stmt = select(File).where(and_(File.vault == vault_name, File.file_id== file_id))
+    vault_id = token_payload.get("vault_id")
+    stmt = select(File).where(and_(File.vault_id == vault_id, File.file_id== file_id))
     file = db_session.scalars(stmt).first()
     if file:
         db_session.delete(file)
-        find_vault_stmt = select(Vault).where(Vault.vault == vault_name)
+        find_vault_stmt = select(Vault).where(Vault.id == vault_id)
         vault = db_session.scalars(find_vault_stmt).first()
         vault.used_storage-=file.size
-        db_session.commit()
         s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=str(file_id))
+        db_session.commit()
         return {"message":"file deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="File not found")
@@ -314,7 +313,7 @@ async def bulk_delete(
         _: None = Depends(require_role(Role.OWNER)),
         db_session = Depends(get_session)
 ):
-    vault_name = token_payload.get("vault")
+    vault_id = token_payload.get("vault_id")
     stmt = select(File).where(File.file_id.in_(file_ids.file_ids))
     files_to_delete = db_session.scalars(stmt).all()
     if len(files_to_delete) == 0:
@@ -336,7 +335,7 @@ async def bulk_delete(
         s3_client.delete_objects(Bucket = S3_BUCKET_NAME, Delete=delete_keys)
 
         # update_used_storage
-        vault_stmt = select(Vault).where(Vault.vault==vault_name)
+        vault_stmt = select(Vault).where(Vault.id==vault_id)
         vault = db_session.scalars(vault_stmt).first()
         vault.used_storage = vault.used_storage - freed_space
         db_session.commit()
@@ -360,9 +359,11 @@ async def get_file_from_url(
     file_id: UUID,
     db_session = Depends(get_session),
 ):
+    stmt = select(Vault).where(Vault.vault == vault_name)
+    vault_id = db_session.scalars(stmt).first().id
     stmt = select(File).where(
         and_(
-            File.vault == vault_name,
+            File.vault_id == vault_id,
             File.file_id == file_id
         )
     )
@@ -383,7 +384,6 @@ async def get_file_from_url(
             ExpiresIn=60 * 10,  # 10 minutes
         )
     except Exception as e:
-        print(e)
         raise HTTPException(500, "Error generating download link")
 
     return RedirectResponse(url=presigned_url, status_code=307)
