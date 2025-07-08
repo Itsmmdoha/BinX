@@ -18,7 +18,7 @@ class VaultInfoModel(BaseModel):
 class FileInfo(BaseModel):
     file: str
     visibility: Visibility
-    file_id: UUID 
+    id: UUID 
     size: int
     date_created: datetime
 

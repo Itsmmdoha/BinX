@@ -15,5 +15,9 @@ class FileUpdateModel(BaseModel):
     new_name: Optional[str] = Field(None, description="New file name")
     visibility: Optional[Visibility] = Field(None, description="File visibility")
 
+class VaultUpdateModel(BaseModel):
+    new_name: Optional[str] = Field(None, description="New vault name")
+    new_password: Optional[str] = Field(None, description="New password for vault")
+
 class BulkDeleteRequest(BaseModel):
     file_ids: List[UUID] = Field(..., description="Array of file IDs to delete", max_length=100)
