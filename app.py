@@ -1,3 +1,4 @@
+from hashlib import new
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File as FastAPIFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -13,7 +14,7 @@ from s3 import s3_client, bucket_exists, S3_BUCKET_NAME
 from config import FRONTEND_HOST
 from sqlalchemy import select, delete, and_
 from auth import Password, Token
-from models.request import VaultCreateCredentials, VaultLoginCredentials, FileUpdateModel, BulkDeleteRequest
+from models.request import VaultCreateCredentials, VaultLoginCredentials, FileUpdateModel, VaultUpdateModel, BulkDeleteRequest
 from models.response import SuccessModel, ErrorModel, LoginSuccessModel, DownloadModel, VaultModel, BulkDeleteResponse 
 from uuid import UUID
 
@@ -142,6 +143,46 @@ def fetch_file_list_from_vault(
         files_stmt = files_stmt.where(File.vault_id == vault_id) # All Files, without any filter
     files = db_session.scalars(files_stmt).all()
     return {"vault": vault, "files": files}
+
+@app.put("/vault",
+    tags=["Vault Operations"],
+    response_model=SuccessModel,
+    description="""
+This endpoint allows you to perform the following actions on a vault:
+
+1. **Rename the vault**  
+2. **Change the vault's password**
+
+- To **rename** the vault, include the `new_name` field in the request body.  
+- To **change password**, include the `new_password` field in the request body.  
+- To perform **both actions**, include both attributes in the same request.
+    """,
+    responses={
+        401: {"model": ErrorModel},
+        403: {"model": ErrorModel},
+        404: {"model": ErrorModel}
+    }
+)
+def update_vault(
+        update_data: VaultUpdateModel,
+        token_payload: dict = Depends(get_token_payload),
+        db_session = Depends(get_session)
+):
+    vault_id= token_payload.get("vault_id")
+    role = token_payload.get("role")
+    if role != Role.OWNER:
+        raise HTTPException(status_code=401, detail="Not Authorized")
+    stmt = select(Vault).where(Vault.id == vault_id)
+    vault = db_session.scalars(stmt).first()
+    if vault is None:
+        raise HTTPException(status_code=404, detail="Vault Not Found")
+    if update_data.new_name:
+        vault.vault = update_data.new_name
+    if update_data.new_password:
+        vault.password_hash = Password.generate_hash(update_data.new_password)
+    db_session.commit()
+    return {"message": "Vault Information Updated successfully"}
+
 
 @app.delete("/vault",
     tags=["Vault Operations"],
