@@ -398,7 +398,7 @@ async def bulk_delete(
     file_ids_to_delete = []
     freed_space = 0
     for file in files_to_delete:
-        file_ids_to_delete.append(file.file_id)
+        file_ids_to_delete.append(file.id)
         freed_space += file.size
     files_not_found = list(set(file_ids.file_ids) - set(file_ids_to_delete))
 
@@ -460,7 +460,7 @@ async def get_file_from_url(
             },
             ExpiresIn=60 * 10,  # 10 minutes
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(500, "Error generating download link")
 
     return RedirectResponse(url=presigned_url, status_code=307)
