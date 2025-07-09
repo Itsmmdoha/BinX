@@ -134,18 +134,18 @@ fetch("/vault/fetch", {
 ```json
 {
   "vault": {
-    "vault": "myvault",
-    "date_created": "2025-06-14T12:00:00",
-    "size": 1000000000,
-    "used_storage": 2345678
+    "vault": "string",
+    "date_created": "2025-07-09T08:09:33.421Z",
+    "size": 0,
+    "used_storage": 0
   },
   "files": [
     {
-      "file": "report.pdf",
-      "file_id": "d73061f0-a1b4-4d63-b0ed-4f7f67f1a6d5",
-      "size": 123456,
+      "file": "string",
       "visibility": "private",
-      "date_created": "2025-06-13T15:30:00"
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "size": 0,
+      "date_created": "2025-07-09T08:09:33.422Z"
     }
   ]
 }
