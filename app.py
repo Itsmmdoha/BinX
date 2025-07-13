@@ -166,12 +166,11 @@ This endpoint allows you to perform the following actions on a vault:
 def update_vault(
         update_data: VaultUpdateModel,
         token_payload: dict = Depends(get_token_payload),
+        _: None = Depends(require_role(Role.OWNER)),
         db_session = Depends(get_session)
 ):
     vault_id= token_payload.get("vault_id")
     role = token_payload.get("role")
-    if role != Role.OWNER:
-        raise HTTPException(status_code=401, detail="Not Authorized")
     stmt = select(Vault).where(Vault.id == vault_id)
     vault = db_session.scalars(stmt).first()
     if vault is None:
@@ -194,12 +193,11 @@ def update_vault(
 )
 def delete_vault(
         token_payload: dict = Depends(get_token_payload),
+        _: None = Depends(require_role(Role.OWNER)),
         db_session = Depends(get_session)
 ):
     vault_id= token_payload.get("vault_id")
     role = token_payload.get("role")
-    if role != Role.OWNER:
-        raise HTTPException(status_code=401, detail="Not Authorized")
     try:
         stmt = select(File.id).where(File.vault_id == vault_id)
         # fetch ids of stored files
