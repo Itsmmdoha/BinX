@@ -53,7 +53,11 @@ class File(Base):
         return f"file(id={self.id!r}, visibility={self.visibility!r},vault={self.vault_id!r},  file={self.file!r}, size={self.size!r}, date_created={self.date_created!r})"
 
 
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(
+    DATABASE_URL, echo=True,
+    pool_pre_ping=True, # check if connection is dead before pooling 
+    pool_recycle=300
+)
 Base.metadata.create_all(engine) # Creates all tables defined by models in Base.metadata, if they don't exist already
 
 
