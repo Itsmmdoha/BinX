@@ -70,7 +70,7 @@ async def initiate_multipart_upload(
 async def upload_chunk(
     file_id: UUID,
     part_number: Annotated[int, Form()],
-    blob: Annotated[UploadFile, fastapiFile()],
+    chunk: Annotated[UploadFile, fastapiFile()],
     token_payload: dict = Depends(get_token_payload),
     _: None = Depends(require_role(Role.OWNER)),
     db_session = Depends(get_session)
@@ -78,9 +78,9 @@ async def upload_chunk(
     vault_id = token_payload.get("vault_id")
 
     # Get chunk size
-    blob.file.seek(0, 2)
-    chunk_size = blob.file.tell()
-    blob.file.seek(0)
+    chunk.file.seek(0, 2)
+    chunk_size = chunk.file.tell()
+    chunk.file.seek(0)
 
     MIN_CHUNK_SIZE = 5 * 1024 * 1024  # 5 MB
     if(part_number ==1 and chunk_size<MIN_CHUNK_SIZE):
@@ -96,7 +96,7 @@ async def upload_chunk(
             Key=str(file_id), 
             PartNumber=part_number,
             UploadId=upload_id,
-            Body=blob.file  
+            Body=chunk.file  
         )
         etag = response["ETag"]
 
