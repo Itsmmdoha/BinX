@@ -17,6 +17,7 @@ Authorization: Bearer <your_jwt_token>
    * [Fetch File List from Vault](#fetch-file-list-from-vault)
    * [Update a Vault](#update-a-vault)
    * [Delete a Vault](#delete-a-vault)
+
 2. [File Operations](#file-operations)
 
    * [Upload a File](#upload-a-file)
@@ -24,6 +25,8 @@ Authorization: Bearer <your_jwt_token>
    * [Delete a File](#delete-a-file)
    * [Bulk Delete Files](#bulk-delete-files)
    * [Update a File (Rename or Change Visibility)](#update-a-file-rename-or-change-visibility)
+   * [Multipart Upload (Large Files)](#multipart-upload-large-files)
+
 
 ---
 
@@ -402,6 +405,199 @@ fetch(`/file/${fileId}`, {
   "message": "File updated successfully."
 }
 ```
+
+Thanks! Based on both your FastAPI router implementation and the OpenAPI JSON, I’ve verified and refined the **Multipart Upload section** to fully align with the OpenAPI contract, schema references, error responses, required fields, and request types.
+
+Below is the **Markdown section** you can insert into your existing `API_Docs.md`:
+
+---
+
+## Multipart Upload (Large Files)
+
+Use multipart upload for large files (recommended for files over **20MB**). This approach breaks a file into smaller chunks, which are uploaded independently. Each chunk must be **at least 5MB** in size (except possibly the final one, if needed).
+
+### Table of Steps
+
+1. [Initiate Upload](#1-initiate-upload)
+2. [Upload Chunks](#2-upload-chunks)
+3. [Complete Upload](#3-complete-upload)
+4. [Abort Upload (Optional)](#4-abort-upload)
+
+All multipart operations require a **JWT Bearer Token** in the header:
+
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+---
+
+### 1. Initiate Upload
+
+**Endpoint:** `POST /file/multipart/initiate`
+
+Start a new multipart upload session. Send the full file name and its size in bytes.
+
+#### Request (application/json)
+
+```json
+{
+  "file_name": "example.mp4",
+  "file_size": 17654967
+}
+```
+
+#### Response (200)
+
+```json
+{
+  "message": "Multipart upload initiated Successfully",
+  "file_id": "06890cca-9bf5-79d8-8000-b1d9ad0670f9"
+}
+```
+
+#### Errors
+
+| Code | Description                 |
+| ---- | --------------------------- |
+| 401  | Unauthorized (JWT required) |
+| 403  | Forbidden (must be owner)   |
+| 507  | Insufficient Storage        |
+| 500  | Internal Server Error       |
+| 422  | Validation Error            |
+
+---
+
+### 2. Upload Chunks
+
+**Endpoint:** `PUT /file/multipart/{file_id}/chunk`
+
+Upload a chunk of the file using `multipart/form-data`.
+Each part must have:
+
+* `part_number`: integer (starting from 1)
+* `chunk`: binary data (chunk)
+
+#### Form Data Fields
+
+| Field        | Type    | Required | Description                |
+| ------------ | ------- | -------- | -------------------------- |
+| part\_number | integer | ✅        | The index of this chunk    |
+| chunk        | file    | ✅        | Binary data for this chunk |
+
+Each chunk must be at least **5MB**. The part number must increment by one for each chunk (1, 2, 3, ...).
+
+#### JS Fetch Example
+
+```js
+const formData = new FormData();
+formData.append("part_number", 1);
+formData.append("chunk", chunkBlob);
+
+fetch(`/file/multipart/${fileId}/chunk`, {
+  method: "PUT",
+  headers: {
+    Authorization: `Bearer ${token}`
+  },
+  body: formData
+});
+```
+
+#### Response (200)
+
+```json
+{
+  "message": "Chunk uploaded successfully"
+}
+```
+
+#### Errors
+
+| Code | Description                      |
+| ---- | -------------------------------- |
+| 400  | Chunk too small or invalid input |
+| 401  | Unauthorized                     |
+| 403  | Forbidden                        |
+| 500  | Upload failed                    |
+| 422  | Validation Error                 |
+
+---
+
+### 3. Complete Upload
+
+**Endpoint:** `POST /file/multipart/{file_id}/complete`
+
+Call this after all chunks have been successfully uploaded. The system will verify file size, compile the chunks, and store the final file.
+
+#### JS Fetch Example
+
+```js
+fetch(`/file/multipart/${fileId}/complete`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
+```
+
+#### Response (200)
+
+```json
+{
+  "message": "File uploaded successfully"
+}
+```
+
+#### Errors
+
+| Code | Description                            |
+| ---- | -------------------------------------- |
+| 400  | Chunk data is incomplete or mismatched |
+| 401  | Unauthorized                           |
+| 403  | Forbidden                              |
+| 507  | Insufficient Storage                   |
+| 500  | Completion failed                      |
+| 422  | Validation Error                       |
+
+---
+
+### 4. Abort Upload (Optional)
+
+**Endpoint:** `DELETE /file/multipart/{file_id}/abort`
+
+If a multipart upload is interrupted or needs to be canceled, this will discard all uploaded parts.
+
+#### Response (200)
+
+```json
+{
+  "message": "multipart upload aborted"
+}
+```
+
+#### Errors
+
+| Code | Description            |
+| ---- | ---------------------- |
+| 404  | Upload not found       |
+| 401  | Unauthorized           |
+| 403  | Forbidden              |
+| 500  | Abort operation failed |
+| 422  | Validation Error       |
+
+---
+
+### Notes
+
+* You must **initiate** before uploading chunks.
+* Only use this flow for files over **20MB**. For smaller files, use `/file/upload`.
+* Chunks must be uploaded **in order** using increasing `part_number`.
+* Each chunk must be **≥ 5MB**, except possibly the final one.
+* Use the `file_id` from step 1 in all other steps.
+
+---
+
+Let me know if you’d like me to patch this section into the actual file or export the modified `.md` for you.
+
 
 ---
 
