@@ -21,3 +21,7 @@ class VaultUpdateModel(BaseModel):
 
 class BulkDeleteRequest(BaseModel):
     file_ids: List[UUID] = Field(..., description="Array of file IDs to delete", max_length=100)
+
+class MultipartFile(BaseModel):
+    file_name: str
+    file_size: int

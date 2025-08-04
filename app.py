@@ -13,6 +13,7 @@ from models.request import VaultCreateCredentials, VaultLoginCredentials, FileUp
 from models.response import SuccessModel, ErrorModel, LoginSuccessModel, DownloadModel, VaultModel, BulkDeleteResponse 
 from models.shared import Role
 from uuid import UUID
+from routers.multipart_upload import multipart_router
 
 
 app = FastAPI(title="BinX",version="0.0.1", redoc_url=None)
@@ -25,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(multipart_router)
 
 if bucket_exists():
     pass

@@ -50,3 +50,7 @@ class Files(BaseModel):
 class BulkDeleteResponse(BaseModel):
     deleted_files: Files 
     files_not_found: Files
+
+class MultipartInitiate(BaseModel):
+    message: str
+    file_id: UUID
