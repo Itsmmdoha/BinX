@@ -1,14 +1,16 @@
 from http.client import HTTP_PORT
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File as fastapiFile, Form, HTTPException
 from uuid import UUID
-from database import Vault, Upload, Chunk, get_session
+
+import fastapi
+from database import Vault, File, Upload, Chunk, get_session
 from s3 import s3_client
 from config import S3_BUCKET_NAME
 from utils import get_token_payload, require_role
 from models.shared import Role
 from models.request import MultipartFile
 from models.response import MultipartInitiate, SuccessModel, ErrorModel
-from sqlalchemy import select, and_
+from sqlalchemy import select, update, and_
 from typing import Annotated
 from starlette.concurrency import run_in_threadpool
 
@@ -38,6 +40,8 @@ async def initiate_multipart_upload(
         raise HTTPException(status_code=507, detail="Insufficient Storage")
     try:
         new_upload = Upload(vault_id = vault_id, file = file_info.file_name, size=file_info.file_size)
+        db_session.add(new_upload);
+        db_session.flush()  # <-- Forces DB to assign the UUID before we use it
         s3_response = await run_in_threadpool(
             s3_client.create_multipart_upload,
             Bucket=S3_BUCKET_NAME,
@@ -45,10 +49,9 @@ async def initiate_multipart_upload(
             Metadata={"vault_id": str(vault_id), "filename": file_info.file_name}
         )
         new_upload.object_upload_id = s3_response["UploadId"]
-        db_session.add(new_upload);
         db_session.commit()
         return {"message": "Multipart upload initiated Successfully", "file_id": new_upload.file_id}
-    except:
+    except Exception as e:
         db_session.rollback()
         raise HTTPException(status_code=500,detail="Could not initiate Multipart Upload")
 
@@ -67,7 +70,7 @@ async def initiate_multipart_upload(
 async def upload_chunk(
     file_id: UUID,
     part_number: Annotated[int, Form()],
-    blob: Annotated[UploadFile, File()],
+    blob: Annotated[UploadFile, fastapiFile()],
     token_payload: dict = Depends(get_token_payload),
     _: None = Depends(require_role(Role.OWNER)),
     db_session = Depends(get_session)
@@ -136,7 +139,7 @@ async def complete_multipart_upload(
     stmt = select(Upload).where(
         and_(Upload.vault_id == vault_id, Upload.file_id == file_id)
     )
-    upload = db_session.execute(stmt).first()
+    upload = db_session.scalars(stmt).first()
 
     if not upload:
         raise HTTPException(status_code=404, detail="Upload not found")
@@ -185,6 +188,12 @@ async def complete_multipart_upload(
             UploadId=upload_id,
             MultipartUpload={"Parts": sorted(parts, key=lambda p: p["PartNumber"])}  # Parts sorted in ascending order by PartNumber 
         )
+        stmt = (
+            update(Vault)
+            .where(Vault.id == vault_id)
+            .values(used_storage=Vault.used_storage + upload_size)
+        )
+        db_session.execute(stmt)
         db_session.commit()
 
     except Exception as e:

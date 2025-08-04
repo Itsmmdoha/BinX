@@ -68,7 +68,7 @@ class Upload(Base):
         ForeignKey("vaults.id", ondelete="CASCADE"), 
         nullable=False
     )
-    object_upload_id: Mapped[str] # upload id from s3
+    object_upload_id: Mapped[str] = mapped_column(nullable=True) # upload id from s3
     file: Mapped[str] = mapped_column(String(255))
     size: Mapped[int] = mapped_column(BigInteger)# Size in bytes
     date_created: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
