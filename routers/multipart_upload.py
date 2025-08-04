@@ -83,6 +83,8 @@ async def upload_chunk(
     if(part_number ==1 and chunk_size<MIN_CHUNK_SIZE):
         raise HTTPException(status_code=400, detail="Chunk too small. Minimum is 5 MB.")
 
+    stmt = select(Upload.object_upload_id).where(and_(Upload.vault_id == vault_id, Upload.file_id == file_id))
+    upload_id = db_session.scalars(stmt).first()
     try:
         # Upload part to S3
         response = await run_in_threadpool(
@@ -90,7 +92,7 @@ async def upload_chunk(
             Bucket=S3_BUCKET_NAME,
             Key=str(file_id), 
             PartNumber=part_number,
-            UploadId=str(file_id),
+            UploadId=upload_id,
             Body=blob.file  
         )
         etag = response["ETag"]
@@ -179,7 +181,7 @@ async def complete_multipart_upload(
         await run_in_threadpool(
             s3_client.complete_multipart_upload,
             Bucket=S3_BUCKET_NAME,
-            Key=str(upload_id),
+            Key=str(file_id),
             UploadId=upload_id,
             MultipartUpload={"Parts": sorted(parts, key=lambda p: p["PartNumber"])}  # Parts sorted in ascending order by PartNumber 
         )
