@@ -92,6 +92,7 @@ class Chunk(Base):
         ForeignKey("uploads.file_id", ondelete="CASCADE"), 
         nullable=False
     )
+    chunk_size: Mapped[int]
     part_number: Mapped[int]
     etag: Mapped[str] = mapped_column(String(64))
 
@@ -100,7 +101,7 @@ class Chunk(Base):
     )
 
     def __repr__(self) -> str:
-        return f"Chunk(id={self.id!r}, vault_id={self.vault_id!r}, part_number={self.part_number!r}, etag={self.etag!r})"
+        return f"Chunk(id={self.id!r}, vault_id={self.vault_id!r}, file_id={self.file_id!r}, chunk_size={self.chunk_size!r}, part_number={self.part_number!r}, etag={self.etag!r})"
 
 
 engine = create_engine(
