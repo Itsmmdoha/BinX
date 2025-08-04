@@ -1,33 +1,18 @@
-from hashlib import new
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File as FastAPIFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import object_session
-from sqlalchemy.util import decode_backslashreplace
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse
-from typing import Callable
-from enum import Enum
 
 from database import Vault, File, get_session
 from s3 import s3_client, bucket_exists, S3_BUCKET_NAME
 from config import FRONTEND_HOST
 from sqlalchemy import select, delete, and_
 from auth import Password, Token
+from utils import get_token_payload, require_role
 from models.request import VaultCreateCredentials, VaultLoginCredentials, FileUpdateModel, VaultUpdateModel, BulkDeleteRequest
 from models.response import SuccessModel, ErrorModel, LoginSuccessModel, DownloadModel, VaultModel, BulkDeleteResponse 
+from models.shared import Role
 from uuid import UUID
-
-class Role(str, Enum):
-    OWNER = "owner"
-    GUEST = "guest"
-
-def require_role(required_role: Role) -> Callable:
-    def enforce_role(token_payload: dict = Depends(get_token_payload)):
-        role = token_payload.get("role")
-        if role != required_role:
-            raise HTTPException(status_code=403, detail="Forbidden Operation")
-    return enforce_role
 
 
 app = FastAPI(title="BinX",version="0.0.1", redoc_url=None)
@@ -40,15 +25,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-bearer_scheme = HTTPBearer()
-
-def get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    token = credentials.credentials
-    try:
-        payload = Token.get_payload(token)
-        return payload
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or Expired Token")
 
 if bucket_exists():
     pass
@@ -170,7 +146,6 @@ def update_vault(
         db_session = Depends(get_session)
 ):
     vault_id= token_payload.get("vault_id")
-    role = token_payload.get("role")
     stmt = select(Vault).where(Vault.id == vault_id)
     vault = db_session.scalars(stmt).first()
     if vault is None:
@@ -197,7 +172,6 @@ def delete_vault(
         db_session = Depends(get_session)
 ):
     vault_id= token_payload.get("vault_id")
-    role = token_payload.get("role")
     try:
         stmt = select(File.id).where(File.vault_id == vault_id)
         # fetch ids of stored files
