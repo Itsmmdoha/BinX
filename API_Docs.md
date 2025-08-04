@@ -596,11 +596,6 @@ If a multipart upload is interrupted or needs to be canceled, this will discard 
 
 ---
 
-Let me know if you’d like me to patch this section into the actual file or export the modified `.md` for you.
-
-
----
-
 ## Notes
 
 * `file_id` is returned from `/vault/fetch` and used in all file operations.
