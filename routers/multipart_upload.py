@@ -49,6 +49,12 @@ async def initiate_multipart_upload(
             Metadata={"vault_id": str(vault_id), "filename": file_info.file_name}
         )
         new_upload.object_upload_id = s3_response["UploadId"]
+        stmt = (
+            update(Vault)
+            .where(Vault.id == vault_id)
+            .values(used_storage=Vault.used_storage + file_info.file_size)
+        )
+        db_session.execute(stmt)
         db_session.commit()
         return {"message": "Multipart upload initiated Successfully", "file_id": new_upload.file_id}
     except Exception as e:
@@ -191,12 +197,6 @@ async def complete_multipart_upload(
             UploadId=upload_id,
             MultipartUpload={"Parts": sorted(parts, key=lambda p: p["PartNumber"])}  # Parts sorted in ascending order by PartNumber 
         )
-        stmt = (
-            update(Vault)
-            .where(Vault.id == vault_id)
-            .values(used_storage=Vault.used_storage + upload_size)
-        )
-        db_session.execute(stmt)
         db_session.commit()
 
     except Exception as e:
@@ -239,6 +239,12 @@ async def abort_multipart_upload(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to abort multipart upload in S3")
 
+    stmt = (
+        update(Vault)
+        .where(Vault.id == vault_id)
+        .values(used_storage=Vault.used_storage - upload.size)
+    )
+    db_session.execute(stmt)
     db_session.delete(upload)
     db_session.commit()
     return {"message": "multipart upload aborted"}
