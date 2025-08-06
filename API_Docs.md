@@ -412,7 +412,7 @@ fetch(`/file/${fileId}`, {
 
 Use multipart upload for large files (recommended for files over **20MB**). This approach breaks a file into smaller chunks, which are uploaded independently. Each chunk must be **at least 5MB** in size (except possibly the final one, if needed).
 
-#### Errors 
+#### Errors
 
 | Code | Description                                                                |
 | ---- | -------------------------------------------------------------------------- |
@@ -423,19 +423,13 @@ Use multipart upload for large files (recommended for files over **20MB**). This
 | 500  | Internal Server Error<br>Upload failed<br>Completion failed                |
 | 507  | Insufficient Storage                                                       |
 
-
 ### Table of Steps
 
 1. [Initiate Upload](#1-initiate-upload)
 2. [Upload Chunks](#2-upload-chunks)
 3. [Complete Upload](#3-complete-upload)
-4. [Abort Upload (Optional)](#4-abort-upload)
-
-All multipart operations require a **JWT Bearer Token** in the header:
-
-```
-Authorization: Bearer <your_jwt_token>
-```
+4. [List Incomplete Uploads](#5-list-incomplete-uploads)
+5. [Abort Upload](#4-abort-upload)
 
 ---
 
@@ -462,7 +456,6 @@ Start a new multipart upload session. Send the full file name and its size in by
   "file_id": "06890cca-9bf5-79d8-8000-b1d9ad0670f9"
 }
 ```
-
 
 ---
 
@@ -509,7 +502,6 @@ fetch(`/file/multipart/${fileId}/chunk`, {
 }
 ```
 
-
 ---
 
 ### 3. Complete Upload
@@ -539,7 +531,39 @@ fetch(`/file/multipart/${fileId}/complete`, {
 
 ---
 
-### 4. Abort Upload (Optional)
+### 4. List Incomplete Uploads  ← *New Endpoint*
+
+**Endpoint:** `GET /file/multipart/list_incomplete`
+
+Retrieve a list of incomplete multipart uploads for the authenticated user's vault, including metadata and which parts have been uploaded so far.
+
+Requires Owner role authorization and JWT Bearer Token.
+
+#### Request Headers
+
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+#### Response (200)
+
+```json
+{
+  "uploads": [
+    {
+      "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "file": "example.mp4",
+      "size": 17654967,
+      "date_created": "2025-08-06T22:09:56.081Z",
+      "uploaded_parts": [1, 2, 3]
+    }
+  ]
+}
+```
+
+---
+
+### 5. Abort Upload (Optional)
 
 **Endpoint:** `DELETE /file/multipart/{file_id}/abort`
 
@@ -553,17 +577,8 @@ If a multipart upload is interrupted or needs to be canceled, this will discard 
 }
 ```
 
-#### Errors
-
-| Code | Description            |
-| ---- | ---------------------- |
-| 404  | Upload not found       |
-| 401  | Unauthorized           |
-| 403  | Forbidden              |
-| 500  | Abort operation failed |
-| 422  | Validation Error       |
-
 ---
+
 
 ### Notes
 
