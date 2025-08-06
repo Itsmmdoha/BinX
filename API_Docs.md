@@ -428,8 +428,8 @@ Use multipart upload for large files (recommended for files over **20MB**). This
 1. [Initiate Upload](#1-initiate-upload)
 2. [Upload Chunks](#2-upload-chunks)
 3. [Complete Upload](#3-complete-upload)
-4. [List Incomplete Uploads](#5-list-incomplete-uploads)
-5. [Abort Upload](#4-abort-upload)
+4. [List Incomplete Uploads](#4-list-incomplete-uploads)
+5. [Abort Upload](#5-abort-upload)
 
 ---
 
