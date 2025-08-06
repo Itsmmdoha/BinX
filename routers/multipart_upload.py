@@ -1,17 +1,16 @@
-from http.client import HTTP_PORT
-from fastapi import APIRouter, Depends, UploadFile, File as fastapiFile, Form, HTTPException
+from binascii import Incomplete
+from fastapi import APIRouter, Depends, UploadFile, File as fastapiFile, Form, HTTPException, responses
 from uuid import UUID
 
-import fastapi
 from database import Vault, File, Upload, Chunk, get_session
 from s3 import s3_client
 from config import S3_BUCKET_NAME
 from utils import get_token_payload, require_role
 from models.shared import Role
 from models.request import MultipartFile
-from models.response import MultipartInitiate, SuccessModel, ErrorModel
+from models.response import MultipartInitiate, SuccessModel, ErrorModel, Uploads 
 from sqlalchemy import select, update, and_
-from typing import Annotated
+from typing import Annotated, List
 from starlette.concurrency import run_in_threadpool
 
 multipart_router = APIRouter(prefix="/file/multipart", tags=["Multipart Upload"])
@@ -205,6 +204,40 @@ async def complete_multipart_upload(
     return SuccessModel(
         message="File uploaded successfully",
     )
+
+
+@multipart_router.get("/list_incomplete",
+    response_model=Uploads,
+    responses={
+        401: {"model": ErrorModel},
+        403: {"model": ErrorModel},
+        500: {"model": ErrorModel}
+    }
+)
+async def list_incomplete_uploads(
+    token_payload: dict = Depends(get_token_payload),
+    _: None = Depends(require_role(Role.OWNER)),
+    db_session = Depends(get_session)
+):
+    vault_id = token_payload.get("vault_id")
+    stmt = select(Upload.file_id,Upload.file, Upload.size, Upload.date_created).where(Upload.vault_id == vault_id)
+    uploads = db_session.execute(stmt).all()
+    stmt = select(Chunk.file_id, Chunk.part_number).where(Chunk.vault_id == vault_id)
+    chunks = db_session.execute(stmt).all()
+    response = [
+        {"file_id": upload.file_id,
+         "file": upload.file,
+         "size": upload.size,
+         "date_created": upload.date_created,
+         "uploaded_parts": []
+         } for upload in uploads
+    ]
+    for chunk in chunks:
+        for upload in response:
+            if upload["file_id"] == chunk.file_id:
+                upload["uploaded_parts"].append(chunk.part_number)
+                break
+    return {"uploads": response}
 
 
 

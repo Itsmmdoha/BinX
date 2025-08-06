@@ -3,7 +3,6 @@ from typing import List
 from uuid import UUID
 from datetime import datetime
 
-from database.db import Base
 from .shared import Visibility
 
 class VaultInfoModel(BaseModel):
@@ -54,3 +53,13 @@ class BulkDeleteResponse(BaseModel):
 class MultipartInitiate(BaseModel):
     message: str
     file_id: UUID
+
+class MultipartUpload(BaseModel):
+    file_id: UUID
+    file: str
+    size: int
+    date_created: datetime
+    uploaded_parts: List[int]
+
+class Uploads(BaseModel):
+    uploads: List[MultipartUpload]
