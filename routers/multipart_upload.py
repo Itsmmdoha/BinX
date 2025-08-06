@@ -89,6 +89,17 @@ async def upload_chunk(
     stmt = select(Upload.object_upload_id).where(and_(Upload.vault_id == vault_id, Upload.file_id == file_id))
     upload_id = db_session.scalars(stmt).first()
     try:
+        # Store chunk metadata in DB
+        new_chunk = Chunk(
+            vault_id=vault_id,
+            file_id=file_id,
+            chunk_size=chunk_size,
+            part_number=part_number,
+            etag=None
+        )
+        db_session.add(new_chunk)
+        db_session.flush()
+
         # Upload part to S3
         response = await run_in_threadpool(
             s3_client.upload_part,
@@ -99,16 +110,8 @@ async def upload_chunk(
             Body=chunk.file  
         )
         etag = response["ETag"]
+        new_chunk.etag = etag
 
-        # Store chunk metadata in DB
-        new_chunk = Chunk(
-            vault_id=vault_id,
-            file_id=file_id,
-            chunk_size=chunk_size,
-            part_number=part_number,
-            etag=etag
-        )
-        db_session.add(new_chunk)
         db_session.commit()
 
         return {"message" : "Chunk uploaded successfully"}

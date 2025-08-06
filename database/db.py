@@ -4,7 +4,7 @@ from sqlalchemy import String
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
-from sqlalchemy import Index
+from sqlalchemy import Index, UniqueConstraint
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -94,10 +94,11 @@ class Chunk(Base):
     )
     chunk_size: Mapped[int]
     part_number: Mapped[int]
-    etag: Mapped[str] = mapped_column(String(64))
+    etag: Mapped[str] = mapped_column(String(64), nullable=True)
 
     __table_args__ = (
         Index("ix_chunks_vault_id_file_id", "vault_id", "file_id"), # multicolumn index on vault_id & file_id 
+        UniqueConstraint("file_id", "part_number", name="uq_file_part_number"), # multicolumn unique constraint on file_id and part_number
     )
 
     def __repr__(self) -> str:
