@@ -406,15 +406,23 @@ fetch(`/file/${fileId}`, {
 }
 ```
 
-Thanks! Based on both your FastAPI router implementation and the OpenAPI JSON, I’ve verified and refined the **Multipart Upload section** to fully align with the OpenAPI contract, schema references, error responses, required fields, and request types.
-
-Below is the **Markdown section** you can insert into your existing `API_Docs.md`:
-
 ---
 
 ## Multipart Upload (Large Files)
 
 Use multipart upload for large files (recommended for files over **20MB**). This approach breaks a file into smaller chunks, which are uploaded independently. Each chunk must be **at least 5MB** in size (except possibly the final one, if needed).
+
+#### Errors 
+
+| Code | Description                                                                |
+| ---- | -------------------------------------------------------------------------- |
+| 400  | Chunk too small or invalid input<br>Chunk data is incomplete or mismatched |
+| 401  | Unauthorized (JWT required)                                                |
+| 403  | Forbidden (must be owner)                                                  |
+| 422  | Validation Error                                                           |
+| 500  | Internal Server Error<br>Upload failed<br>Completion failed                |
+| 507  | Insufficient Storage                                                       |
+
 
 ### Table of Steps
 
@@ -455,15 +463,6 @@ Start a new multipart upload session. Send the full file name and its size in by
 }
 ```
 
-#### Errors
-
-| Code | Description                 |
-| ---- | --------------------------- |
-| 401  | Unauthorized (JWT required) |
-| 403  | Forbidden (must be owner)   |
-| 507  | Insufficient Storage        |
-| 500  | Internal Server Error       |
-| 422  | Validation Error            |
 
 ---
 
@@ -510,15 +509,6 @@ fetch(`/file/multipart/${fileId}/chunk`, {
 }
 ```
 
-#### Errors
-
-| Code | Description                      |
-| ---- | -------------------------------- |
-| 400  | Chunk too small or invalid input |
-| 401  | Unauthorized                     |
-| 403  | Forbidden                        |
-| 500  | Upload failed                    |
-| 422  | Validation Error                 |
 
 ---
 
@@ -546,17 +536,6 @@ fetch(`/file/multipart/${fileId}/complete`, {
   "message": "File uploaded successfully"
 }
 ```
-
-#### Errors
-
-| Code | Description                            |
-| ---- | -------------------------------------- |
-| 400  | Chunk data is incomplete or mismatched |
-| 401  | Unauthorized                           |
-| 403  | Forbidden                              |
-| 507  | Insufficient Storage                   |
-| 500  | Completion failed                      |
-| 422  | Validation Error                       |
 
 ---
 
