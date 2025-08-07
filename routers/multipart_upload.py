@@ -91,8 +91,6 @@ async def upload_chunk(
     if(part_number ==1 and chunk_size<MIN_CHUNK_SIZE):
         raise HTTPException(status_code=400, detail="Chunk too small. Minimum is 5 MB.")
 
-    stmt = select(Upload.object_upload_id).where(and_(Upload.vault_id == vault_id, Upload.file_id == file_id))
-    upload_id = db_session.scalars(stmt).first()
     try:
         # Store chunk metadata in DB
         new_chunk = Chunk(
@@ -104,6 +102,8 @@ async def upload_chunk(
         )
         db_session.add(new_chunk)
         db_session.flush()
+        stmt = select(Upload.object_upload_id).where(and_(Upload.vault_id == vault_id, Upload.file_id == file_id))
+        upload_id = db_session.scalars(stmt).first()
 
         # Upload part to S3
         response = await run_in_threadpool(
