@@ -1,5 +1,4 @@
-from binascii import Incomplete
-from fastapi import APIRouter, Depends, UploadFile, File as fastapiFile, Form, HTTPException, responses
+from fastapi import APIRouter, Depends, UploadFile, File as fastapiFile, Form, HTTPException
 from uuid import UUID
 
 from database import Vault, File, Upload, Chunk, get_session
@@ -10,7 +9,7 @@ from models.shared import Role
 from models.request import MultipartFile
 from models.response import MultipartInitiate, SuccessModel, ErrorModel, Uploads 
 from sqlalchemy import select, update, and_
-from typing import Annotated, List
+from typing import Annotated
 from starlette.concurrency import run_in_threadpool
 
 multipart_router = APIRouter(prefix="/file/multipart", tags=["Multipart Upload"])
@@ -48,12 +47,6 @@ async def initiate_multipart_upload(
             Metadata={"vault_id": str(vault_id), "filename": file_info.file_name}
         )
         new_upload.object_upload_id = s3_response["UploadId"]
-        stmt = (
-            update(Vault)
-            .where(Vault.id == vault_id)
-            .values(used_storage=Vault.used_storage + file_info.file_size)
-        )
-        db_session.execute(stmt)
         db_session.commit()
         return {"message": "Multipart upload initiated Successfully", "file_id": new_upload.file_id}
     except Exception as e:
@@ -162,7 +155,7 @@ async def complete_multipart_upload(
     chunks = db_session.execute(stmt).all()
 
     if not chunks:
-        raise HTTPException(status_code=400, detail="No chunks found")
+        raise HTTPException(status_code=404, detail="No chunks found")
 
     new_file = File(
         id = upload.file_id,
@@ -196,6 +189,13 @@ async def complete_multipart_upload(
             UploadId=upload_id,
             MultipartUpload={"Parts": sorted(parts, key=lambda p: p["PartNumber"])}  # Parts sorted in ascending order by PartNumber 
         )
+        # Update Storage Usage
+        stmt = (
+            update(Vault)
+            .where(Vault.id == vault_id)
+            .values(used_storage=Vault.used_storage + upload.size)
+        )
+        db_session.execute(stmt)
         db_session.commit()
 
     except Exception as e:
