@@ -7,6 +7,7 @@ from database import Vault, File, get_session
 from s3 import s3_client, bucket_exists, S3_BUCKET_NAME
 from config import FRONTEND_HOST
 from sqlalchemy import select, delete, and_
+from sqlalchemy.exc import IntegrityError
 from auth import Password, Token
 from utils import get_token_payload, require_role
 from models.request import VaultCreateCredentials, VaultLoginCredentials, FileUpdateModel, VaultUpdateModel, BulkDeleteRequest
@@ -156,8 +157,11 @@ def update_vault(
         vault.vault = update_data.new_name
     if update_data.new_password:
         vault.password_hash = Password.generate_hash(update_data.new_password)
-    db_session.commit()
-    return {"message": "Vault Information Updated successfully"}
+    try:
+        db_session.commit()
+        return {"message": "Vault Information Updated successfully"}
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="Vault with that name already exists, try a different name.")
 
 
 @app.delete("/vault",
