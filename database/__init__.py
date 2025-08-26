@@ -1,1 +1,1 @@
-from .db import Vault, File, get_session
+from .db import Vault, File, Upload, Chunk, get_session

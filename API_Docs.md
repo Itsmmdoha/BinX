@@ -17,6 +17,7 @@ Authorization: Bearer <your_jwt_token>
    * [Fetch File List from Vault](#fetch-file-list-from-vault)
    * [Update a Vault](#update-a-vault)
    * [Delete a Vault](#delete-a-vault)
+
 2. [File Operations](#file-operations)
 
    * [Upload a File](#upload-a-file)
@@ -24,6 +25,8 @@ Authorization: Bearer <your_jwt_token>
    * [Delete a File](#delete-a-file)
    * [Bulk Delete Files](#bulk-delete-files)
    * [Update a File (Rename or Change Visibility)](#update-a-file-rename-or-change-visibility)
+   * [Multipart Upload (Large Files)](#multipart-upload-large-files)
+
 
 ---
 
@@ -402,6 +405,188 @@ fetch(`/file/${fileId}`, {
   "message": "File updated successfully."
 }
 ```
+
+---
+
+## Multipart Upload (Large Files)
+
+Use multipart upload for large files (recommended for files over **20MB**). This approach breaks a file into smaller chunks, which are uploaded independently. Each chunk must be **at least 5MB** in size (except possibly the final one, if needed).
+
+#### Errors
+
+| Code | Description                                                                |
+| ---- | -------------------------------------------------------------------------- |
+| 400  | Chunk too small or invalid input<br>Chunk data is incomplete or mismatched |
+| 401  | Unauthorized (JWT required)                                                |
+| 403  | Forbidden (must be owner)                                                  |
+| 422  | Validation Error                                                           |
+| 500  | Internal Server Error<br>Upload failed<br>Completion failed                |
+| 507  | Insufficient Storage                                                       |
+
+### Table of Steps
+
+1. [Initiate Upload](#1-initiate-upload)
+2. [Upload Chunks](#2-upload-chunks)
+3. [Complete Upload](#3-complete-upload)
+4. [List Incomplete Uploads](#4-list-incomplete-uploads)
+5. [Abort Upload](#5-abort-upload)
+
+---
+
+### 1. Initiate Upload
+
+**Endpoint:** `POST /file/multipart/initiate`
+
+Start a new multipart upload session. Send the full file name and its size in bytes.
+
+#### Request (application/json)
+
+```json
+{
+  "file_name": "example.mp4",
+  "file_size": 17654967
+}
+```
+
+#### Response (200)
+
+```json
+{
+  "message": "Multipart upload initiated Successfully",
+  "file_id": "06890cca-9bf5-79d8-8000-b1d9ad0670f9"
+}
+```
+
+---
+
+### 2. Upload Chunks
+
+**Endpoint:** `PUT /file/multipart/{file_id}/chunk`
+
+Upload a chunk of the file using `multipart/form-data`.
+Each part must have:
+
+* `part_number`: integer (starting from 1)
+* `chunk`: binary data (chunk)
+
+#### Form Data Fields
+
+| Field        | Type    | Required | Description                |
+| ------------ | ------- | -------- | -------------------------- |
+| part\_number | integer | ✅        | The index of this chunk    |
+| chunk        | file    | ✅        | Binary data for this chunk |
+
+Each chunk must be at least **5MB**. The part number must increment by one for each chunk (1, 2, 3, ...).
+
+#### JS Fetch Example
+
+```js
+const formData = new FormData();
+formData.append("part_number", 1);
+formData.append("chunk", chunkBlob);
+
+fetch(`/file/multipart/${fileId}/chunk`, {
+  method: "PUT",
+  headers: {
+    Authorization: `Bearer ${token}`
+  },
+  body: formData
+});
+```
+
+#### Response (200)
+
+```json
+{
+  "message": "Chunk uploaded successfully"
+}
+```
+
+---
+
+### 3. Complete Upload
+
+**Endpoint:** `POST /file/multipart/{file_id}/complete`
+
+Call this after all chunks have been successfully uploaded. The system will verify file size, compile the chunks, and store the final file.
+
+#### JS Fetch Example
+
+```js
+fetch(`/file/multipart/${fileId}/complete`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
+```
+
+#### Response (200)
+
+```json
+{
+  "message": "File uploaded successfully"
+}
+```
+
+---
+
+### 4. List Incomplete Uploads  ← *New Endpoint*
+
+**Endpoint:** `GET /file/multipart/list_incomplete`
+
+Retrieve a list of incomplete multipart uploads for the authenticated user's vault, including metadata and which parts have been uploaded so far.
+
+Requires Owner role authorization and JWT Bearer Token.
+
+#### Request Headers
+
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+#### Response (200)
+
+```json
+{
+  "uploads": [
+    {
+      "file_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "file": "example.mp4",
+      "size": 17654967,
+      "date_created": "2025-08-06T22:09:56.081Z",
+      "uploaded_parts": [1, 2, 3]
+    }
+  ]
+}
+```
+
+---
+
+### 5. Abort Upload (Optional)
+
+**Endpoint:** `DELETE /file/multipart/{file_id}/abort`
+
+If a multipart upload is interrupted or needs to be canceled, this will discard all uploaded parts.
+
+#### Response (200)
+
+```json
+{
+  "message": "multipart upload aborted"
+}
+```
+
+---
+
+
+### Notes
+
+* You must **initiate** before uploading chunks.
+* Only use this flow for files over **20MB**. For smaller files, use `/file/upload`.
+* Chunks must be uploaded **in order** using increasing `part_number`.
+* Each chunk must be **≥ 5MB**, except possibly the final one.
+* Use the `file_id` from step 1 in all other steps.
 
 ---
 
