@@ -178,9 +178,15 @@ def delete_vault(
         stmt = select(File.id).where(File.vault_id == vault_id)
         # fetch ids of stored files
         file_ids_to_delete = db_session.scalars(stmt).all()
+
         # delete from database
         stmt = delete(Vault).where(Vault.id == vault_id)
         db_session.execute(stmt)
+
+        if len(file_ids_to_delete) == 0:
+            db_session.commit()
+            return {"message": "Vault Deleted successfully"}
+
         # delete from s3
         delete_keys = {"Objects": [{"Key": str(file_id)} for file_id in file_ids_to_delete]}
         s3_client.delete_objects(Bucket = S3_BUCKET_NAME, Delete=delete_keys)
