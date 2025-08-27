@@ -271,13 +271,6 @@ async def abort_multipart_upload(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to abort multipart upload in S3")
-
-    stmt = (
-        update(Vault)
-        .where(Vault.id == vault_id)
-        .values(used_storage=Vault.used_storage - upload.size)
-    )
-    db_session.execute(stmt)
     db_session.delete(upload)
     db_session.commit()
     return {"message": "multipart upload aborted"}
