@@ -128,9 +128,11 @@ Here's the [API Documentation](./API_Docs.md)
 
 ## ⚙️ TODO
 
+* **Async Database Session**: Implement and use an asynchronous database session for better performance with FastAPI.
 * **Audit Logging**: Track actions and access patterns.
 * **Multi-part Upload**: Optimize uploads with multi-part uploads **(Done)**
 * **Better Error-Handling**: Handle errors better for easier debugging.
+
 
 ## 🚀 Deployment
 
